@@ -22,4 +22,4 @@ EXPOSE 50051/tcp
 
 ENV OPERATOR_ADDRESS=${OPERATOR_ADDRESS:-operator.alameda.svc.cluster.local:50050}
 
-CMD ["python3", "-B", "/alameda-ai/services/demo_server/main.py"]
+CMD ["python3", "-B", "/alameda-ai/services/arima/main.py"]

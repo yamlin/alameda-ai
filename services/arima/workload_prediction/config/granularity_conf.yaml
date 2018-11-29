@@ -1,0 +1,38 @@
+1h:
+  data_granularity: 1h
+  mid: 1h
+  data_amount: 30d
+  data_amount_sec: 2592000
+  minimal_sample_size: 700
+  training_steps: 2000
+  prediction_steps: 168
+
+
+6h:
+  data_granularity: 6h
+  mid: 6h
+  data_amount: 120d
+  data_amount_sec: 10368000
+  minimal_sample_size: 460
+  training_steps: 2000
+  prediction_steps: 120
+
+
+12h:
+  data_granularity: 12h
+  mid: 12h
+  data_amount: 365d
+  data_amount_sec: 31536000
+  minimal_sample_size: 700
+  training_steps: 2000
+  prediction_steps: 180
+
+
+30s:
+  data_granularity: 30s
+  mid: 30s
+  data_amount: 2h
+  data_amount_sec: 7200
+  minimal_sample_size: 230
+  training_steps: 600
+  prediction_steps: 60
