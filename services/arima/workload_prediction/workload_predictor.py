@@ -19,7 +19,7 @@ from services.arima.workload_prediction.preprocessor import Preprocessor
 from services.arima.workload_prediction.workload_utils \
     import get_csv_data, get_container_name, get_metric_name_and_conf
 from services.arima.workload_prediction.recommendation \
-    import get_container_recommendation_result
+    import get_mock_recommendation
 
 
 class WorkloadPredictor:
@@ -137,9 +137,7 @@ class WorkloadPredictor:
                             filename_tags_map, time_scaling_sec)
 
         # [8] write recommendation result via GRPC client
-        rc_result = get_container_recommendation_result(
-            self.log, pod, input_file_list, output_file_list,
-            self.measurement_conf, filename_tags_map, time_scaling_sec)
+        rc_result = get_mock_recommendation(pod)
         if rc_result is not None:
             self.dao.write_container_recommendation_result(rc_result)
 
