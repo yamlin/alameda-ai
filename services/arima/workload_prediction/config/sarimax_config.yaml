@@ -1,0 +1,13 @@
+order:
+  p: 1
+  d: 0
+  q: 0
+
+seasonal_order:
+  P: 1
+  D: 1
+  Q: 0
+  s: 16
+
+
+  
