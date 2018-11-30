@@ -1,10 +1,11 @@
-# pylint: disable=no-self-use, unused-argument, invalid-name, no-member
+# pylint: disable=import-error, no-self-use, unused-argument, invalid-name, no-member
 ''' The Metric DAO '''
 import grpc
 
-from framework.log.logger import Logger
 from alameda_api.v1alpha1.operator import server_pb2, server_pb2_grpc
+from framework.log.logger import Logger
 from framework.utils.sys_utils import get_metric_server_address
+
 
 class MockMetricDAO(object):
     ''' Mock DAO '''
@@ -138,6 +139,31 @@ class MetricDAO(object):
 
         return resource
 
+    def __parse_sample(self, data):
+        ''' Parse the sample data '''
+        return {
+            "time": data.time.seconds,
+            "value": data.value
+        }
+
+    def __parse_metrics(self, data):
+        ''' Parse the metrics '''
+        result = []
+        if not data:
+            return result
+
+        for d in data:
+            r = {"labels": {}}
+            for k, v in d.labels.items():
+                r["labels"][k] = v
+
+            # add the sample data
+            r["data"] = list(
+                map(self.__parse_sample, d.samples)
+            )
+            result.append(r)
+        return result
+
     def write_container_prediction_data(self, prediction):
         ''' Write the prediction result to server. '''
         self.logger.info("Write prediction result: %s", str(prediction))
@@ -189,7 +215,7 @@ class MetricDAO(object):
             client = self.__get_client()
             resp = client.ListMetrics(req)
             if resp.status.code == 0:
-                return resp.metrics
+                return self.__parse_metrics(resp.metrics)
             else:
                 msg = "List metric error [code={}]".format(resp.status.code)
                 raise Exception(msg)
