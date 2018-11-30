@@ -18,14 +18,13 @@ from services.arima.workload_prediction.process_threading \
 from services.arima.workload_prediction.preprocessor import Preprocessor
 from services.arima.workload_prediction.workload_utils \
     import get_csv_data, get_container_name, get_metric_name_and_conf
-from services.arima.workload_prediction.recommendation \
-    import get_mock_recommendation
+from services.arima.workload_prediction.recommendation import Recommender
 
 
 class WorkloadPredictor:
     """ Workload predictor """
 
-    def __init__(self, log=None, dao=None, preprocesser=None):
+    def __init__(self, log=None, dao=None, preprocesser=None, recommender=None):
         # Max filename length of linux is 255;
         # reserve capacity 20 character for further name appending
         # e.g., .prdt_log in _predict_write_influx()
@@ -49,6 +48,8 @@ class WorkloadPredictor:
         self.dao = dao or MetricDAO()
         self.preprocessor = preprocesser or Preprocessor()
         self.target_metrics = measurement_conf.keys()
+        self.recommender = recommender or Recommender(
+            self.measurement_conf, log=self.log, dao=self.dao)
 
     def predict(self, pod, thread_num=1, target_labels=None):
         """ Prediction
@@ -137,9 +138,8 @@ class WorkloadPredictor:
                             filename_tags_map, time_scaling_sec)
 
         # [8] write recommendation result via GRPC client
-        rc_result = get_mock_recommendation(pod)
-        if rc_result is not None:
-            self.dao.write_container_recommendation_result(rc_result)
+        self.recommender.set_time_scaling_sec(time_scaling_sec)
+        self.recommender.recommend(pod, output_file_list, filename_tags_map)
 
         # [9] Delete files.
         if os.path.exists(file_folder_name['input']):
