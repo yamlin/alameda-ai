@@ -109,7 +109,9 @@ class FileDataStore(object):
         data = self.read_data()
         for p in pods:
             t = (p['namespace'], p['uid'], p['name'])
-            data[t] = {"type": p['type']}
+            data[t] = {"type": p['type'],
+                       "policy": p['policy']}
+
 
         local_file = self.__write_random_file(data)
         res = self.file_system.update_file(self.file, local_file)
