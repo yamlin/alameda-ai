@@ -81,21 +81,30 @@ class SARIMAXPredictor:
                 int(len(observed_data[self.VALUES]) / OBSERVATION_MULTIPLE)
 
         # Make prediction with SARIMAX
-        model = sm.tsa.statespace.SARIMAX(
-            observed_data[self.VALUES],
-            order=(self.cfg[self.ORDER]['p'], self.cfg[self.ORDER]['d'],
-                   self.cfg[self.ORDER]['q']),
-            seasonal_order=(
-                self.cfg[self.SEASONAL_ORDER]['P'],
-                self.cfg[self.SEASONAL_ORDER]['D'],
-                self.cfg[self.SEASONAL_ORDER]['Q'],
-                self.cfg[self.SEASONAL_ORDER]['s']),
-            enforce_stationarity=False,
-            enforce_invertibility=False)
+        try:
+            model = sm.tsa.statespace.SARIMAX(
+                observed_data[self.VALUES],
+                order=(self.cfg[self.ORDER]['p'], self.cfg[self.ORDER]['d'],
+                       self.cfg[self.ORDER]['q']),
+                seasonal_order=(
+                    self.cfg[self.SEASONAL_ORDER]['P'],
+                    self.cfg[self.SEASONAL_ORDER]['D'],
+                    self.cfg[self.SEASONAL_ORDER]['Q'],
+                    self.cfg[self.SEASONAL_ORDER]['s']),
+                enforce_stationarity=False,
+                enforce_invertibility=False)
 
-        mdl_fit = model.fit(disp=0)
-        pred_temp = mdl_fit.get_forecast(steps=predict_steps)
-        predictions = pred_temp.predicted_mean
+            mdl_fit = model.fit(disp=0)
+            pred_temp = mdl_fit.get_forecast(steps=predict_steps)
+            predictions = pred_temp.predicted_mean
+        except np.linalg.linalg.LinAlgError:
+            self.log.debug("Variance of observed data is: %s",
+                           np.var(observed_data[self.VALUES]))
+            predictions = np.mean(observed_data[self.VALUES], axis=0)
+            predictions = np.tile(predictions, (predict_steps, 1))
+        except Exception as err:  # pylint: disable=W0703
+            self.log.error(err)
+            return None
 
         predicted_data = {
             self.VALUES: predictions.reshape(-1, 1),
