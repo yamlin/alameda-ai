@@ -283,6 +283,7 @@ class WorkloadPredictor:
                 config['measurement'], pod['namespace'], pod['pod_name'],
                 config['data_amount_sec'])
 
+            self.log.debug("Queried workload data: %s", queried_result)
             return queried_result
         except Exception as e:  # pylint: disable=W0703
             self.log.error(e)

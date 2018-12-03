@@ -95,7 +95,7 @@ def predict_by_series(log, measurement_conf, granularity_conf, input_file_list,
                     config['name']))
 
         if not ignored:
-            predictor = SARIMAXPredictor()
+            predictor = SARIMAXPredictor(log=log)
 
             prediction_thread = PredictionThread(
                 _predict_write_file, log, predictor, observed_data, file_name,
