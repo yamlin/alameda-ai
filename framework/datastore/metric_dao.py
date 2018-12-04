@@ -181,8 +181,16 @@ class MetricDAO(object):
         try:
             client = self.__get_client()
             resp = client.CreatePredictResult(req)
-            if resp.status.code != 0:
-                msg = "Write prediction error [code={}]".format(resp.status.code)
+            if resp.status.code == 0:
+                pass
+            elif resp.status.code == 5:
+                # we skip raising exception for the NOT_FOUND case
+                msg = "Write prediction error [uid={}, code={}]".format(
+                    pod.uid, resp.status.code)
+                self.logger.error("Could not get metrics: %s", msg)
+            else:
+                msg = "Write prediction error [uid={}, code={}]".format(
+                    pod.uid, resp.status.code)
                 raise Exception(msg)
         except Exception as e:
             self.logger.error("Could not get metrics: %s", str(e))
