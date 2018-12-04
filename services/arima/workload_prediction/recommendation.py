@@ -200,8 +200,13 @@ class Recommender:
                         "namespace": pod_info.get("namespace"),
                         "pod_name": pod_info.get("pod_name"),
                         "containers": list(container_result.values())}
-            self.log.debug("Write data: %s", out_data)
-            self.dao.write_container_recommendation_result(out_data)
+            self.log.debug("Write recommendation data: %s", out_data)
+            try:
+                self.dao.write_container_recommendation_result(out_data)
+            except Exception as err:  # pylint: disable=W0703
+                self.log.error(err)
+                self.log.error("Write POD recommendation error: {%s}",
+                               pod_info)
 
     def integrate_container_recommendation_result(self, container_init_set, container_set):
         """Integrate init_resource and recommendation result"""

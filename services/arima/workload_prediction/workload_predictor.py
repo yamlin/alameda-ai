@@ -305,9 +305,11 @@ class WorkloadPredictor:
         if container_result:
             out_data['containers'] = list(container_result.values())
             self.log.debug('Write prediction data: %s', out_data)
-            self.dao.write_container_prediction_data(out_data)
-
-        return out_data
+            try:
+                self.dao.write_container_prediction_data(out_data)
+            except Exception as err:  # pylint: disable=W0703
+                self.log.error(err)
+                self.log.error("Write POD prediction error: {%s}", pod_info)
 
     def format_container_prediction_result(self, container_files,
                                            filename_tags_map,
