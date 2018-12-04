@@ -64,7 +64,7 @@ class MetricDAO(object):
             key = "CONTAINER_CPU_USAGE_TOTAL"
         elif metric_type == "cpu_rate":
             key = "CONTAINER_CPU_USAGE_TOTAL_RATE"
-        elif metric_type == "mem":
+        elif metric_type == "memory":
             key = "CONTAINER_MEMORY_USAGE"
         else:
             key = "CONTAINER_CPU_USAGE_TOTAL"
