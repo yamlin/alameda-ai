@@ -19,7 +19,11 @@ class MockMetricDAO(object):
 
     def write_container_prediction_data(self, predictions):
         ''' Write predictions '''
-        self.logger.info("Write prediction result: %s", str(predictions))
+        self.logger.info("Write container prediction result: %s", str(predictions))
+
+    def write_node_prediction_data(self, predictions):
+        ''' Write predictions '''
+        self.logger.info("Write node prediction result: %s", str(predictions))
 
     def get_container_observed_data(self, metric_type, namespace, pod_name, duration):
         # pylint: disable=line-too-long
