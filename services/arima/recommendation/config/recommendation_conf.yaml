@@ -1,0 +1,8 @@
+data_granularity_sec: 30
+data_amount_sec: 7200
+data_amount_init_sec: 300
+
+
+metric_types:
+  cpu_rate: cpu
+  memory: memory
