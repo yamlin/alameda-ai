@@ -3,14 +3,15 @@
 import os
 import yaml
 from framework.log.logger import Logger
-from framework.datastore.metric_dao import MockMetricDAO
+from framework.datastore.metric_dao import MockMetricDAO, MockPredictionDAO
 
 
 class DataProcessor:
     """Data Processor"""
-    def __init__(self, logger=None, dao=None, config=None):
+    def __init__(self, logger=None, dao=None, influx_dao=None, config=None):
         self.logger = logger or Logger()
         self.dao = dao or MockMetricDAO()
+        self.influx_dao = influx_dao or MockPredictionDAO()
 
         self.config = config
         if self.config is None:
@@ -63,26 +64,116 @@ class DataProcessor:
 
         return data
 
-    def query_containers_predicted_data(self):
+    def query_containers_predicted_data(self, namespace, pod_name):
         """Query pod's containers predicted data"""
-        # Query from internal Influxdb
-        pass
 
-    def query_pod_observed_data(self):
+        try:
+            data = dict()
+            for metric_type in self.config["metric_types"]:
+                queried_data = self.influx_dao.get_container_predicted_data(
+                    metric_type=metric_type,
+                    namespace=namespace,
+                    pod_name=pod_name,
+                    duration=self.config.get("data_amount_sec", 7200))
+                data.update(
+                    {self.config["metric_types"][metric_type]: queried_data})
+
+            data = self._format_containers_workload_data(data)
+        except Exception as err:
+            self.logger.error("Error in 'query_containers_predicted_data': "
+                              "%s", str(err))
+            return None
+
+        return data
+
+    def query_pod_observed_data(self, namespace, pod_name):
         """Query pod observed data"""
-        pass
 
-    def query_pod_predicted_data(self):
+        containers_data = \
+            self.query_containers_observed_data(namespace, pod_name)
+        if containers_data is None:
+            return None
+
+        try:
+            pod_data = dict()
+            for metric_type in self.config["metric_types"].values():
+                list_points = []
+                for container_data in containers_data.values():
+                    list_points.append(container_data[metric_type])
+
+                pod_data[metric_type] = \
+                    self._sum_up_list_workload_points(list_points)
+
+        except Exception as err:
+            self.logger.error("Error in 'query_pod_observed_data': "
+                              "%s", str(err))
+            return None
+
+        return pod_data
+
+    def query_pod_predicted_data(self, namespace, pod_name):
         """Query pod predicted data"""
-        pass
+
+        containers_data = \
+            self.query_containers_predicted_data(namespace, pod_name)
+        if containers_data is None:
+            return None
+
+        try:
+            pod_data = dict()
+            for metric_type in self.config["metric_types"].values():
+                list_points = []
+                for container_data in containers_data.values():
+                    list_points.append(container_data[metric_type])
+
+                pod_data[metric_type] = \
+                    self._sum_up_list_workload_points(list_points)
+        except Exception as err:
+            self.logger.error("Error in 'query_pod_predicted_data': "
+                              "%s", str(err))
+            return None
+
+        return pod_data
 
     def query_nodes_observed_data(self):
         """Query node observed data"""
-        pass
+
+        try:
+            data = dict()
+            for metric_type in self.config["metric_types"]:
+                queried_data = self.dao.get_node_observed_data(
+                    metric_type=metric_type,
+                    duration=self.config.get("data_amount_sec", 7200))
+                data.update(
+                    {self.config["metric_types"][metric_type]: queried_data})
+
+            data = self._format_nodes_workload_data(data)
+        except Exception as err:
+            self.logger.error("Error in 'query_nodes_observed_data': "
+                              "%s", str(err))
+            return None
+
+        return data
 
     def query_nodes_predicted_data(self):
         """Query node predicted data"""
-        pass
+
+        try:
+            data = dict()
+            for metric_type in self.config["metric_types"]:
+                queried_data = self.influx_dao.get_node_predicted_data(
+                    metric_type=metric_type,
+                    duration=self.config.get("data_amount_sec", 7200))
+                data.update(
+                    {self.config["metric_types"][metric_type]: queried_data})
+
+            data = self._format_nodes_workload_data(data)
+        except Exception as err:
+            self.logger.error("Error in 'query_nodes_predicted_data': "
+                              "%s", str(err))
+            return None
+
+        return data
 
     def _format_containers_workload_data(self, data):
         """
@@ -103,7 +194,28 @@ class DataProcessor:
                     formatted_data[container_name].update(
                         {metric_type: metric_data})
 
-        return self._align_container_metric_workload_points(formatted_data)
+        return self._align_metric_workload_points(formatted_data)
+
+    def _format_nodes_workload_data(self, data):
+        """
+        Format the queried nodes workload data from
+        'by metric type -> by node' to 'by node -> by metric type'
+        """
+
+        formatted_data = dict()
+        for metric_type, nodes_data in data.items():
+            for node_data in nodes_data:
+                node_name = node_data["labels"]["node_name"]
+                metric_data = self._format_workload_points(
+                    node_data["data"], self.config["data_granularity_sec"])
+
+                if node_name not in formatted_data:
+                    formatted_data[node_name] = {metric_type: metric_data}
+                else:
+                    formatted_data[node_name].update(
+                        {metric_type: metric_data})
+
+        return self._align_metric_workload_points(formatted_data)
 
     @staticmethod
     def _format_workload_points(data, time_scaling_sec):
@@ -117,19 +229,19 @@ class DataProcessor:
 
         return formatted_data
 
-    def _align_container_metric_workload_points(self, data):
+    def _align_metric_workload_points(self, data):
         """
         Align different metric type of workload points by time
         for each container.
         """
 
         formatted_data = dict()
-        for container_name, container_data in data.items():
-            aligned_data = self._align_list_points(container_data)
+        for name, sub_data in data.items():
+            aligned_data = self._align_list_points(sub_data)
             if not aligned_data:
                 return None
 
-            formatted_data[container_name] = aligned_data
+            formatted_data[name] = aligned_data
 
         return formatted_data
 
@@ -155,6 +267,17 @@ class DataProcessor:
         for key, points in points_map.items():
             points_map_matched[key] = {k: points[k] for k in points_match}
         return points_map_matched
+
+    @staticmethod
+    def _sum_up_list_workload_points(list_points):
+        """Sum up a list of workload points."""
+
+        points_sum = dict()
+        for points in list_points:
+            points_sum = {k: points_sum.get(k, 0) + points.get(k, 0)
+                          for k in set(points_sum) | set(points)}
+
+        return points_sum
 
     def get_container_init_resource(self):
         """Get container init_resource"""
