@@ -1,7 +1,7 @@
 """scheduler"""
 from abc import ABCMeta, abstractmethod
 from framework.log.logger import Logger
-from services.arima.recommendation.data_processor import DataProcessor
+from services.orchestra.recommendation.data_processor import DataProcessor
 
 
 class Scheduler(metaclass=ABCMeta):

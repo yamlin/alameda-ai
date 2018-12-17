@@ -1,8 +1,8 @@
 """Recommender"""
 
 from framework.log.logger import Logger
-from services.arima.recommendation.scheduler import Scheduler
-from services.arima.recommendation.data_processor import DataProcessor
+from services.orchestra.recommendation.scheduler import Scheduler
+from services.orchestra.recommendation.data_processor import DataProcessor
 
 
 class Recommender:

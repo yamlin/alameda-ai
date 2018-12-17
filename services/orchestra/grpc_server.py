@@ -12,7 +12,7 @@ from framework.log.logger import Logger
 from framework.datastore.file_dao import FileDataStore
 from framework.filesystem.fsal import FileSystem, FileSystemType
 from alameda_api.v1alpha1.ai_service import ai_service_pb2_grpc
-from services.arima.alameda_servicer import AlamedaServicer
+from services.orchestra.alameda_servicer import AlamedaServicer
 
 _ONE_DAY_IN_SECONDS = 24 * 60 * 60
 

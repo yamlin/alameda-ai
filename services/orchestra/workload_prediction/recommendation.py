@@ -6,7 +6,7 @@ import numpy as np
 
 from framework.log.logger import Logger, LogLevel
 from framework.datastore.metric_dao import MetricDAO
-from services.arima.workload_prediction.workload_utils import \
+from services.orchestra.workload_prediction.workload_utils import \
     get_csv_data, get_container_name, get_metric_name_and_conf
 
 

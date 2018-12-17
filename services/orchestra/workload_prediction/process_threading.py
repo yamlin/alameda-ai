@@ -5,9 +5,9 @@ import os
 import threading
 import numpy as np
 
-from services.arima.workload_prediction.sarimax_predictor \
+from services.orchestra.workload_prediction.sarimax_predictor \
     import SARIMAXPredictor
-from services.arima.workload_prediction.workload_utils \
+from services.orchestra.workload_prediction.workload_utils \
     import get_csv_data
 
 
