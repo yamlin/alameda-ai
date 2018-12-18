@@ -7,7 +7,7 @@ import numpy as np
 import statsmodels.api as sm
 
 from framework.log.logger import Logger
-from services.arima.workload_prediction.preprocessor import Preprocessor
+from services.orchestra.workload_prediction.preprocessor import Preprocessor
 
 
 OBSERVATION_MULTIPLE = 3

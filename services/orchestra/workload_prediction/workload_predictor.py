@@ -13,12 +13,12 @@ import regex as re
 
 from framework.log.logger import Logger, LogLevel
 from framework.datastore.metric_dao import MetricDAO
-from services.arima.workload_prediction.process_threading \
+from services.orchestra.workload_prediction.process_threading \
     import predict_by_series
-from services.arima.workload_prediction.preprocessor import Preprocessor
-from services.arima.workload_prediction.workload_utils \
+from services.orchestra.workload_prediction.preprocessor import Preprocessor
+from services.orchestra.workload_prediction.workload_utils \
     import get_csv_data, get_container_name, get_metric_name_and_conf
-from services.arima.workload_prediction.recommendation import Recommender
+from services.orchestra.workload_prediction.recommendation import Recommender
 
 
 class WorkloadPredictor:

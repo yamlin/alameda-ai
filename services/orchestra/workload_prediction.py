@@ -4,7 +4,7 @@
 import time
 from framework.log.logger import Logger, LogLevel
 from framework.datastore.file_dao import FileDataStore
-from services.arima.workload_prediction.workload_predictor \
+from services.orchestra.workload_prediction.workload_predictor \
     import WorkloadPredictor
 
 

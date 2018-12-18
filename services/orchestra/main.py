@@ -9,7 +9,7 @@ from framework.log.logger import Logger
 def main():
     '''Main entrypoint for demo server.'''
 
-    svc_rootpath = '/alameda-ai/services/arima'
+    svc_rootpath = '/alameda-ai/services/orchestra'
     pyscripts = ['grpc_server.py', 'workload_prediction.py']
 
     log = Logger()
