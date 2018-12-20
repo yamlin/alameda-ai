@@ -1,6 +1,7 @@
 """Data processor"""
 # pylint: disable=broad-except
 import os
+import re
 import yaml
 from framework.log.logger import Logger
 from framework.datastore.metric_dao import MockMetricDAO, MockPredictionDAO
@@ -279,17 +280,118 @@ class DataProcessor:
 
         return points_sum
 
-    def get_container_init_resource(self):
+    def get_containers_init_resource(self, namespace, pod_name):
         """Get container init_resource"""
-        pass
 
-    def get_container_resources(self):
+        try:
+            data = self.dao.get_container_init_resource(
+                namespace=namespace,
+                pod_name=pod_name)
+
+            data = self._format_containers_requests_limits(data)
+        except Exception as err:
+            self.logger.error("Error in 'get_containers_init_resource': "
+                              "%s %s", type(err), str(err))
+            return None
+
+        return data
+
+    def get_containers_resources(self, namespace, pod_name):
         """Get container spec of requests/limits"""
-        pass
 
-    def __format_requests_limits(self):
+        try:
+            data = self.dao.get_container_resources(
+                namespace=namespace,
+                pod_name=pod_name)
+
+            data = self._format_containers_requests_limits(data)
+        except Exception as err:
+            self.logger.error("Error in 'get_containers_resources': "
+                              "%s %s", type(err), str(err))
+            return None
+
+        return data
+
+    def _format_containers_requests_limits(self, data):
         """Format the queried resources to numerical value"""
-        pass
+
+        formatted_data = dict()
+        for container_data in data:
+            container_name = container_data["container_name"]
+            limits = container_data["resources"]["limits"]
+            requests = container_data["resources"]["requests"]
+
+            for metric_type in limits:
+                if metric_type == 'cpu':
+                    limits[metric_type] = \
+                        self._convert_cpu_str2val(limits[metric_type])
+                    requests[metric_type] = \
+                        self._convert_cpu_str2val(requests[metric_type])
+                elif metric_type == 'memory':
+                    limits[metric_type] = \
+                        self._convert_mem_str2val(limits[metric_type])
+                    requests[metric_type] = \
+                        self._convert_mem_str2val(requests[metric_type])
+                else:
+                    raise NameError(metric_type, "Metric type is not defined.")
+
+            formatted_data[container_name] = {
+                "limits": limits, "requests": requests}
+
+        return formatted_data
+
+    def _convert_cpu_str2val(self, cpu):
+        """Convert the format of cpu resource from string to numerical value"""
+
+        # Check if it can be converted to numerical value in cpu units directly.
+        if self._isfloat(cpu):
+            return float(cpu)
+
+        # Check if it is in milli core format and then convert to cpu units.
+        if cpu.endswith('m') and self._isfloat(cpu.replace('m', '', 1)):
+            return float(cpu.replace('m', '')) / 1000.0
+
+        # Otherwise, raise error.
+        raise ValueError(cpu, "The format of cpu resource is not supported, "
+                         "it cannot be converted to numerical value.")
+
+    def _convert_mem_str2val(self, mem):
+        """Convert the format of memory resource from string to
+        numerical value"""
+
+        # Check if it can be converted to numerical value in bytes directly.
+        if self._isfloat(mem):
+            return float(mem)
+
+        # Check if it meets the regular expression with correct memory
+        # capacity unit, and convert it to bytes.
+        capacity = {
+            "K": 1000, "M": 1000 ** 2, "G": 1000 ** 3,
+            "T": 1000 ** 4, "P": 1000 ** 5, "E": 1000 ** 6,
+            "Ki": 1024, "Mi": 1024 ** 2, "Gi": 1024 ** 3,
+            "Ti": 1024 ** 4, "Pi": 1024 ** 5, "Ei": 1024 ** 6
+        }
+
+        regex = '^([0-9.]+)([iEKMGTP]*)$'
+        match = re.search(regex, mem)
+        if match:
+            val, unit = match.groups()
+            if self._isfloat(val) and (unit in capacity):
+                return float(val) * capacity[unit]
+
+        # Otherwise, raise error.
+        raise ValueError(mem, "The format of memory resource is not supported,"
+                         " it cannot be converted to numerical value.")
+
+    @staticmethod
+    def _isfloat(val):
+        """Check if the value can be converted to float or not."""
+
+        try:
+            float(val)
+        except ValueError:
+            return False
+        return True
 
     def write_pod_recommendation_result(self):
         """Write pod recommendation result via gRPC client"""
