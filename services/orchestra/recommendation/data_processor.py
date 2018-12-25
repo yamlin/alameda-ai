@@ -393,10 +393,46 @@ class DataProcessor:
             return False
         return True
 
-    def write_pod_recommendation_result(self):
+    def get_pod_recommendation_result(self, pod, init_resource, resources):
         """Write pod recommendation result via gRPC client"""
-        pass
 
-    def __format_container_recommendation_result(self):
+        try:
+            result = {
+                "uid": pod["uid"],
+                "namespace": pod["namespace"],
+                "pod_name": pod["pod_name"],
+                "containers": self._format_container_recommendation_result(
+                    init_resource, resources)
+            }
+            return result
+        except Exception as err:
+            self.logger.error("Error in 'write_pod_recommendation_result': "
+                              "%s %s", type(err), str(err))
+
+    def _format_container_recommendation_result(self, init_resource, resources):
         """Format the recommendation result to write data by gRPC client."""
-        pass
+
+        formatted_data = []
+        time_scaling_sec = self.config["data_granularity_sec"]
+        for container_name in resources:
+            container_set = {
+                "container_name": container_name,
+                "recommendations": []
+            }
+            for resource_set in resources[container_name]:
+
+                recommendation_set = {
+                    "time": resource_set["time"] * time_scaling_sec,
+                    "resources": {
+                        "requests": resource_set["requests"],
+                        "limits": resource_set["limits"]
+                    }
+                }
+                container_set["recommendations"].append(recommendation_set)
+
+            if init_resource and init_resource.get(container_name):
+                container_set["init_resource"] = init_resource[container_name]
+
+            formatted_data.append(container_set)
+
+        return formatted_data
