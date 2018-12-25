@@ -51,9 +51,9 @@ class WorkloadPredictor:
         self.recommender = recommender or Recommender(
             self.measurement_conf, log=self.log, dao=self.dao)
 
-    def predict(self, pod, thread_num=1, target_labels=None):
+    def predict(self, unit, thread_num=1, target_labels=None):
         """ Prediction
-        :param pod: (dict) the info of the pod that need train/predict.
+        :param unit: (dict) the info of the unit that need train/predict.
         :param thread_num: the number of threading.
         :param target_labels: (list) target labels.
         """
@@ -72,14 +72,14 @@ class WorkloadPredictor:
             config.update(self.granularity_conf)
 
             # [1] Retrieve data from influxdb
-            queried_data = self._query_data(config, pod, target_labels)
+            queried_data = self._query_data(config, unit, target_labels)
             if not queried_data:
-                self.log.debug('Pod "%s" query results in "%s" is empty; '
-                               'thus not predicted\n',
-                               pod, config['measurement'])
+                self.log.debug('Predict unit "%s" query results in "%s" '
+                               'is empty; thus not predicted\n',
+                               unit, config['measurement'])
                 continue
-            self.log.info('Pod "{%s}" data in "%s" were queried.',
-                          pod, config['measurement'])
+            self.log.info('Predict unit "{%s}" data in "%s" were queried.',
+                          unit, config['measurement'])
 
             # [2] Group data to series
             series_map, time_scaling_sec, filename_tags_submap = \
@@ -134,12 +134,12 @@ class WorkloadPredictor:
             if os.path.exists(out_file_name):
                 output_file_list.append(out_file_name)
 
-        self.write_pod_data(pod, output_file_list,
-                            filename_tags_map, time_scaling_sec)
+        self.write_predict_data(unit, output_file_list,
+                                filename_tags_map, time_scaling_sec)
 
         # [8] write recommendation result via GRPC client
         self.recommender.set_time_scaling_sec(time_scaling_sec)
-        self.recommender.recommend(pod, output_file_list, filename_tags_map)
+        self.recommender.recommend(unit, output_file_list, filename_tags_map)
 
         # [9] Delete files.
         if os.path.exists(file_folder_name['input']):
@@ -270,46 +270,71 @@ class WorkloadPredictor:
         return series_map, time_scaling_sec, filename_tags_map
 
     # pylint: disable=W0613
-    def _query_data(self, config, pod, target_labels=None, target_mid=None):
-
-        self.log.debug('DAO get_container_observed_data INPUT: '
-                       'metric_name=%s, namespace=%s, '
-                       'pod_name=%s, data_amount=%d',
-                       config['measurement'], pod['namespace'],
-                       pod['pod_name'], config['data_amount_sec'])
+    def _query_data(self, config, unit, target_labels=None, target_mid=None):
 
         try:
-            queried_result = self.dao.get_container_observed_data(
-                config['measurement'], pod['namespace'], pod['pod_name'],
-                config['data_amount_sec'])
-
+            unit_type = unit.get('type')
+            if unit_type == 'POD':
+                queried_result = self.dao.get_container_observed_data(
+                    config['measurement'], unit['namespace'],
+                    unit['pod_name'], config['data_amount_sec'])
+            elif unit_type == 'NODE':
+                queried_result = self.dao.get_node_observed_data(
+                    config['measurement'], config['data_amount_sec'],
+                    node_name=unit['node_name']
+                )
+            else:
+                raise NameError(unit_type, "Predict unit type is not defined.")
             self.log.debug("Queried workload data: %s", queried_result)
             return queried_result
-        except Exception as e:  # pylint: disable=W0703
-            self.log.error(e)
+        except KeyError as err:
+            self.log.error("Error in query data: %s %s", type(err), str(err))
+            self.log.error("There might be a mismatch in predict unit info: "
+                           "%s", unit)
+        except Exception as err:  # pylint: disable=broad-except
+            self.log.error("Error in query data: %s %s", type(err), str(err))
 
-    def write_pod_data(self, pod_info, output_file_list,
-                       filename_tags_map, time_scaling_sec):
-        ''' write the json data to alameda, convert infxludb posting
+    def write_predict_data(self, unit, output_file_list,
+                           filename_tags_map, time_scaling_sec):
+        ''' write the json data to alameda, convert influxdb posting
         data format into json(dict) object '''
 
-        out_data = {
-            'uid': pod_info.get('uid'),
-            'namespace': pod_info.get('namespace'),
-            'pod_name': pod_info.get('pod_name'),
-            'containers': []
-        }
+        try:
+            unit_type = unit.get('type')
+            if unit_type == 'POD':
+                out_data = {
+                    'uid': unit['uid'],
+                    'namespace': unit['namespace'],
+                    'pod_name': unit['pod_name'],
+                    'containers': []
+                }
 
-        container_result = self.format_container_prediction_result(
-            output_file_list, filename_tags_map, time_scaling_sec)
-        if container_result:
-            out_data['containers'] = list(container_result.values())
-            self.log.debug('Write prediction data: %s', out_data)
-            try:
-                self.dao.write_container_prediction_data(out_data)
-            except Exception as err:  # pylint: disable=W0703
-                self.log.error(err)
-                self.log.error("Write POD prediction error: {%s}", pod_info)
+                container_result = self.format_container_prediction_result(
+                    output_file_list, filename_tags_map, time_scaling_sec)
+                if container_result:
+                    out_data['containers'] = list(container_result.values())
+                    self.log.debug('Write container prediction data: '
+                                   '%s', out_data)
+                    self.dao.write_container_prediction_data(out_data)
+
+            elif unit_type == 'NODE':
+                node_result = self.format_node_prediction_result(
+                    output_file_list, time_scaling_sec)
+
+                if node_result:
+                    out_data = {
+                        'node_name': unit['node_name']
+                    }
+                    out_data.update(node_result)
+                    self.log.debug('Write node prediction data: '
+                                   '%s', out_data)
+                    self.dao.write_node_prediction_data(out_data)
+
+            else:
+                raise NameError(unit_type, "Predict unit type is not defined.")
+        except Exception as err:  # pylint: disable=W0703
+            self.log.error("Write POD prediction error: %s %s in {%s}",
+                           type(err), str(err), unit)
 
     def format_container_prediction_result(self, container_files,
                                            filename_tags_map,
@@ -360,3 +385,43 @@ class WorkloadPredictor:
                 container_set[container_name]['raw_predict'].update(metric_set)
 
         return container_set
+
+    def format_node_prediction_result(self, node_files, time_scaling_sec):
+
+        """read data from every prediction file of the node.
+           files are in the same container name, but different metric result;
+           each file is in the same metric name."""
+        node_set = {'raw_predict': dict()}
+        for file_path in node_files:
+            metric_set = dict()
+            data = get_csv_data(file_path)
+
+            metric_name, config = get_metric_name_and_conf(
+                file_path, self.measurement_conf)
+
+            if metric_name is None:
+                continue
+
+            metric_set[metric_name] = []
+
+            prdt_times = data[:, 0]
+            prdt_values = data[:, 1:]
+            for index_time, target_time in enumerate(prdt_times):
+                data_pair = dict()
+                data_pair['time'] = int(target_time * time_scaling_sec)
+
+                for index_field in range(len(config['fields'])):
+                    data_type = config['fields'][index_field]['data_type']
+                    field_name = config['fields'][index_field]['name']
+                    if data_type == 'i':
+                        field_value = str(
+                            int(round(prdt_values[index_time, index_field])))
+                    else:
+                        field_value = str(prdt_values[index_time, index_field])
+
+                    data_pair[field_name] = field_value
+                metric_set[metric_name].append(data_pair)
+
+            node_set['raw_predict'].update(metric_set)
+
+        return node_set
