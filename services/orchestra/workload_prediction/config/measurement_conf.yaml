@@ -1,14 +1,12 @@
-container_cpu:
-  name: container_cpu
+cpu:
+  name: cpu
   measurement: "cpu"
   diff: false
-  tag_keys: [cluster, namespace, pod_name]
   fields: [{name: value, data_type: ""}]
 
 
-container_mem:
-  name: container_mem
+mem:
+  name: mem
   measurement: "memory"
   diff: false
-  tag_keys: [cluster, namespace, pod_name]
   fields: [{name: value, data_type: ""}]
