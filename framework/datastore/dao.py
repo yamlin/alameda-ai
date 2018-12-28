@@ -84,11 +84,12 @@ class DAO(object):
             msg = "Error: data_type {} request is fail: code={}, msg={}".format(
                 data_type, res.status.code, res.status.message
             )
+            self.logger.error(msg)
             raise Exception(msg)
         return res
 
     def write_data(self, data_type, args):
-        self.logger.info("Write data: %s", str(args))
+        self.logger.info("Write data: type = %s args = %s", data_type, str(args))
         client = self.__get_client()
         if data_type == "container_prediction":
             pb = ParseDict(args, server_pb2.CreatePodPredictionsRequest())
@@ -112,6 +113,7 @@ class DAO(object):
             msg = "Error: data_type {} request is fail: code={}, msg={}".format(
                 data_type, res.status.code, res.status.message
             )
+            self.logger.error(msg)
             raise Exception(msg)
 
         return res
