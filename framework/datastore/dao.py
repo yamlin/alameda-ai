@@ -1,24 +1,24 @@
-# pylint: disable=invalid-name,missing-docstring,   
+# pylint: disable=invalid-name,missing-docstring
 
 from google.protobuf import empty_pb2
 from google.protobuf.json_format import MessageToDict, ParseDict
 import grpc
 from alameda_api.v1alpha1.datahub import server_pb2, server_pb2_grpc
-# from framework.log.logger import Logger
-# from framework.utils.sys_utils import get_metric_server_address
+from framework.log.logger import Logger
+from framework.utils.sys_utils import get_metric_server_address
 
 
 class DAO(object):
     def __init__(self, config=None, client=None):
         ''' The construct method '''
         self.client = client
-        # if not config:
-        #     config = {
-        #         "metric_server": get_metric_server_address()
-        #     }
+        if not config:
+            config = {
+                "metric_server": get_metric_server_address()
+            }
         self.config = config
-        # self.logger = Logger()
-        # self.logger.info("Metric DAO config: %s", str(self.config))
+        self.logger = Logger()
+        self.logger.info("Metric DAO config: %s", str(self.config))
 
     def __get_client(self):
         ''' Get the grpc client '''
@@ -52,7 +52,7 @@ class DAO(object):
                                 preserving_proto_field_name=True,
                                 including_default_value_fields=True)
         elif data_type == "node_observed":
-            pb = empty_pb2.Empty()
+            pb = ParseDict(args, server_pb2.ListNodeMetricsRequest())
             res = MessageToDict(client.ListNodeMetrics(pb),
                                 preserving_proto_field_name=True,
                                 including_default_value_fields=True)
@@ -115,13 +115,3 @@ class DAO(object):
             raise Exception(msg)
 
         return res
-
-
-if __name__ == "__main__":
-    config = {"metric_server": "172.31.86.90:50050"}
-    dao = DAO(config)
-    import json
-    for m in ["container_init", "container_observed", "container_predicted",
-                "node_predicted", "node_observed", "pod_list", "node_list",
-                "container_init_resource", "container_resource"]:
-        print(m, json.dumps(dao.get_data(m, {})), "\n")
