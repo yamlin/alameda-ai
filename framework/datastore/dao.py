@@ -8,7 +8,7 @@ from framework.log.logger import Logger
 from framework.utils.sys_utils import get_metric_server_address
 
 
-class DAO(object):
+class DatahubClient(object):
     def __init__(self, config=None, client=None):
         ''' The construct method '''
         self.client = client
