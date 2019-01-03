@@ -5,7 +5,7 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 import grpc
 from alameda_api.v1alpha1.datahub import server_pb2, server_pb2_grpc
 from framework.log.logger import Logger
-from framework.utils.sys_utils import get_metric_server_address
+from framework.utils.sys_utils import get_datahub_server
 
 
 class DatahubClient(object):
@@ -14,18 +14,18 @@ class DatahubClient(object):
         self.client = client
         if not config:
             config = {
-                "metric_server": get_metric_server_address()
+                "server": get_datahub_server()
             }
         self.config = config
         self.logger = Logger()
-        self.logger.info("Metric DAO config: %s", str(self.config))
+        self.logger.info("DAO config: %s", str(self.config))
 
     def __get_client(self):
         ''' Get the grpc client '''
         if self.client:
             return self.client
 
-        conn_str = self.config["metric_server"]
+        conn_str = self.config["server"]
         channel = grpc.insecure_channel(conn_str)
         return server_pb2_grpc.DatahubServiceStub(channel)
 
