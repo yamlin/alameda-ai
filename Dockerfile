@@ -21,5 +21,6 @@ RUN pip install filelock
 EXPOSE 50051/tcp
 
 ENV OPERATOR_ADDRESS=${OPERATOR_ADDRESS:-operator.alameda.svc.cluster.local:50050}
+ENV DATAHUB_ADDRESS=${DATAHUB_ADDRESS:-datahub.alameda.svc.cluster.local:50050}
 
 CMD ["python3", "-B", "/alameda-ai/services/orchestra/main.py"]
