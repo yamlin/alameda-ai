@@ -67,14 +67,9 @@ class DatahubClient(object):
             res = MessageToDict(client.ListAlamedaNodes(pb),
                                 preserving_proto_field_name=True,
                                 including_default_value_fields=True)
-        elif data_type == "container_init_resource":
-            pb = ParseDict(args, server_pb2.ListPodPredictionsRequest())
-            res = MessageToDict(client.ListPodPredictions(pb),
-                                preserving_proto_field_name=True,
-                                including_default_value_fields=True)
-        elif data_type == "container_resource":
-            pb = ParseDict(args, server_pb2.ListPodPredictionsRequest())
-            res = MessageToDict(client.ListPodPredictions(pb),
+        elif data_type == "container_recommendation":
+            pb = ParseDict(args, server_pb2.ListPodRecommendationsRequest())
+            res = MessageToDict(client.ListPodRecommendations(pb),
                                 preserving_proto_field_name=True,
                                 including_default_value_fields=True)
         else:
