@@ -87,7 +87,9 @@ class DataProcessor:
         try:
             data_type = self.OBSERVED
             if not time_range:
-                time_range = self.get_time_range(data_type)
+                time = self.convert_time(pod_info["start_time"])
+                duration = self.config.get("data_amount_init_sec", 300)
+                time_range = self.get_time_range(start_time=time, duration=duration)
 
             args = {
                 "namespaced_name": pod_info["namespaced_name"],
@@ -111,7 +113,8 @@ class DataProcessor:
         try:
             data_type = self.OBSERVED
             if not time_range:
-                time_range = self.get_time_range(data_type)
+                time = self.convert_time(datetime.utcnow())
+                time_range = self.get_time_range(end_time=time)
 
             args = {
                 "namespaced_name": pod_info["namespaced_name"],
@@ -135,7 +138,8 @@ class DataProcessor:
         try:
             data_type = self.PREDICTED
             if not time_range:
-                time_range = self.get_time_range(data_type)
+                time = self.convert_time(datetime.utcnow())
+                time_range = self.get_time_range(start_time=time)
 
             args = {
                 "namespaced_name": pod_info["namespaced_name"],
@@ -203,7 +207,8 @@ class DataProcessor:
         try:
             data_type = self.OBSERVED
             if not time_range:
-                time_range = self.get_time_range(data_type)
+                time = self.convert_time(datetime.utcnow())
+                time_range = self.get_time_range(end_time=time)
 
             args = {
                 "node_name": [node["name"] for node in node_list],
@@ -224,7 +229,8 @@ class DataProcessor:
         try:
             data_type = self.PREDICTED
             if not time_range:
-                time_range = self.get_time_range(data_type)
+                time = self.convert_time(datetime.utcnow())
+                time_range = self.get_time_range(start_time=time)
 
             args = {
                 "node_name": [node["name"] for node in node_list],
@@ -418,8 +424,6 @@ class DataProcessor:
             converted_time = int((converted_time - epoch).total_seconds())
         elif isinstance(time, datetime):
             converted_time = int((time - epoch).total_seconds())
-            converted_time = \
-                datetime.utcfromtimestamp(converted_time).strftime(time_format)
         elif isinstance(time, int):
             converted_time = \
                 datetime.utcfromtimestamp(time).strftime(time_format)
@@ -430,27 +434,38 @@ class DataProcessor:
 
         return converted_time
 
-    def get_time_range(self, data_type, time=None, duration=None):
-        """Format time range with timestamp and duration."""
+    def get_time_range(self, start_time=None, end_time=None, duration=None):
+        """
+        Format time range with timestamp and duration.
+        This method must have at least one time object input,
+        [start_time] or [end_time].
 
-        if not time:  # current time if there's no requested time
-            time = datetime.utcnow()
+        :param start_time: (int) start time timestamp in seconds. If None,
+            then [start_time] equals to [end_time-duration]
+        :param end_time: (int) end time timestamp in seconds. If None,
+            then [end_time] equals to [start_time+duration]
+        :param duration: (int) duration in seconds. If None, then [duration]
+            would be set to default '7200 seconds'.
+        :return: (dict) time range
+        """
+
+        if not start_time and not end_time:
+            raise ValueError("Method 'get_time_range' must have at least one "
+                             "time object input, [start_time] or [end_time].")
+
         if not duration:  # default data amount if there's no requested duration
-            duration = \
-                timedelta(seconds=self.config.get("data_amount_sec", 7200))
+            duration = self.config.get("data_amount_sec", 7200)
 
-        if data_type is self.PREDICTED:
-            time_range = {
-                "start_time": self.convert_time(time),
-                "end_time": self.convert_time(time + duration),
-                "step": self.config.get("data_granularity_sec", 30)
-            }
-        else:
-            time_range = {
-                "start_time": self.convert_time(time - duration),
-                "end_time": self.convert_time(time),
-                "step": self.config.get("data_granularity_sec", 30)
-            }
+        if not start_time:
+            start_time = end_time - duration
+        if not end_time:
+            end_time = start_time + duration
+
+        time_range = {
+            "start_time": self.convert_time(start_time),
+            "end_time": self.convert_time(end_time),
+            "step": self.config.get("data_granularity_sec", 30)
+        }
 
         return time_range
 
