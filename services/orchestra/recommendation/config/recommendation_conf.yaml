@@ -3,6 +3,6 @@ data_amount_sec: 7200
 data_amount_init_sec: 300
 
 
-metric_types:
-  cpu_rate: cpu
-  memory: memory
+scheduler_weighting:
+  CPU_USAGE_SECONDS_PERCENTAGE: 1
+  MEMORY_USAGE_BYTES: 0
