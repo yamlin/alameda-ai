@@ -16,7 +16,7 @@ MIN_SAMPLE_SIZE = 6
 
 # Prediction steps is the multiplication of input sample size and
 # PREDICT_DATA_RATE
-PREDICT_DATA_RATE = 0.5
+PREDICT_DATA_RATE = 0.25
 
 
 class PredictionThread(threading.Thread):
