@@ -19,6 +19,8 @@ Current Algorithm:
 
 import operator
 import copy
+import os
+import yaml
 
 from framework.log.logger import Logger
 from services.orchestra.recommendation.data_processor import DataProcessor
@@ -50,24 +52,30 @@ class StableScheduler(object):
         # Initialize metric_names to None. Will be concrete when prediction data is queried.
         self.metric_names = None
 
-    def schedule(self, pod_info):
+        # Initialize scheduling_time to None. Will be concrete when calling "get_scheduling_time"
+        self.scheduling_time = None
+
+    def schedule(self):
 
         """
         Main function for StableScheduler.
 
-        Args:
-            pod_info: necessary info about pods that will be scheduled
         Returns:
             allocation_result: scheduling results for the pods
+            scheduling_scores: score comparison before/after scheduling
+            scheduled_node_data: node workload prediction after scheduling
 
         """
 
         # query pod/node predicted workload
-        pod_predicted_data, node_predicted_data, pods_current_node = \
-            self.query_workload_data(pod_info)
+        pod_predicted_data, node_predicted_data, pods_current_node, pod_info = \
+            self.query_workload_data()
 
         # extract metric names
         self.metric_names = self.get_metric_names(node_predicted_data)
+
+        # get scheduling time
+        self.scheduling_time = self.get_scheduling_time(node_predicted_data)
 
         # subtract all the workload of the rescheduled pods from their current node's workload
         node_workload = self.all_pod_workload_subtraction(pod_predicted_data,
@@ -75,15 +83,27 @@ class StableScheduler(object):
                                                           pods_current_node)
 
         # allocate each pod sequentially to new node.
-        allocation_result = self.multiple_allocation(pod_predicted_data, node_workload, pod_info)
+        allocation_result, modified_node_data = self.multiple_allocation(pod_predicted_data,
+                                                                         node_workload, pod_info)
 
-        return allocation_result
+        # calculate scheduling scores before/after pod schedulings:
+        scheduling_scores = self.get_scheduling_scores(node_predicted_data, modified_node_data)
+
+        # convert node workload after scheduling into suitable format
+        scheduled_node_data = self.node_workload_formatter(modified_node_data)
+
+        return allocation_result, scheduling_scores, scheduled_node_data
 
     @staticmethod
     def get_metric_names(node_predicted_data):
 
         """
         Extract metric_names from node prediction data
+
+        Args:
+            node_predicted_data: prediction workload for all nodes in the cluster
+        Returns:
+            metric_names: a list of metric names in the queried workload.
 
         """
 
@@ -92,19 +112,23 @@ class StableScheduler(object):
 
         return metric_names
 
-    def query_workload_data(self, pod_info):
+    def query_workload_data(self):
 
         """
         Query predicted workload data for (a) rescheduled pods (b) cluster nodes.
 
-        Args:
-            pod_info: necessary info about pods that will be scheduled
         Returns:
             pod_predicted_data: prediction workload for pods that are to be scheduled
             node_predicted_data: prediction workload for all nodes in the cluster
             pods_current_node: list of node that the pods currently locate in
+            pod_info: detailed information about pods that are to be scheduled.
 
         """
+        # query information for pods that are to be scheduled:
+        pod_info = self.processor.get_pod_list()
+
+        # get available node list in the cluster
+        node_list = self.processor.get_node_list()
 
         pod_predicted_data = []
         pods_current_node = []
@@ -112,13 +136,12 @@ class StableScheduler(object):
         for pod in pod_info:
 
             pod_predicted_data.append(
-                self.processor.query_pod_predicted_data(
-                    pod['namespace'], pod['pod_name']))
-            pods_current_nodes.append(pod['current_node'])
+                self.processor.query_pod_predicted_data(pod))
+            pods_current_node.append(pod['node_name'])
 
-        node_predicted_data = self.processor.query_nodes_predicted_data()
+        node_predicted_data = self.processor.query_nodes_predicted_data(node_list)
 
-        return pod_predicted_data, node_predicted_data, pods_current_node
+        return pod_predicted_data, node_predicted_data, pods_current_node, pod_info
 
     @staticmethod
     def all_pod_workload_subtraction(pod_predicted_data,
@@ -158,6 +181,7 @@ class StableScheduler(object):
             pod_info: necessary info about pods that will be scheduled
         Returns:
             allocation_result: scheduling results for the pods
+            modified_workload: node workloads after scheduling
         """
 
         allocation_result = {}
@@ -167,17 +191,21 @@ class StableScheduler(object):
         for i, ind_pod_data in enumerate(pod_predicted_data):
 
             new_node_name = self.individual_allocation(ind_pod_data, modified_workload)
-            allocation_result.update({
-                (pod_info[i]['namespace'], pod_info[i]['uid'], pod_info[i]['pod_name']):
-                    {"uid": pod_info[i]['uid'],
-                     "namespace": pod_info[i]['namespace'],
-                     "pod_name": pod_info[i]['pod_name'],
-                     "nodes": [new_node_name]}})
+
+            key = i
+            val = {"namespaced_name": pod_info[i]['namespaced_name'],
+                   "apply_recommendation_now": True,
+                   "assign_pod_policy": {"time": self.scheduling_time,
+                                         "node_name": new_node_name}
+                  }
+
+            allocation_result.update({key:val})
+
             modified_workload = self.pod_workload_addition(ind_pod_data,
                                                            modified_workload,
                                                            new_node_name)
 
-        return allocation_result
+        return allocation_result, modified_workload
 
     def individual_allocation(self, ind_pod_predicted_data, node_workload):
 
@@ -300,3 +328,108 @@ class StableScheduler(object):
         result, _ = zip(*sorted(node_scores.items(), key=operator.itemgetter(1)))
 
         return result[0]
+
+    def get_scheduling_time(self, node_predicted_data):
+
+        """
+        Get the scheduling time
+
+        Args:
+            node_predicted_data: prediction workload for all nodes in the cluster
+        Returns:
+            scheduling_time: timestamp for the scheduling this time.
+
+        """
+
+        # get earliest time among the timestamp of node_predicted_data
+        timestamps = [i for i in node_predicted_data.values()][0][self.metric_names[0]].keys()
+        scheduling_time = self.processor.convert_time(min(timestamps) *
+                                                      self.config['data_granularity_sec'])
+
+        return scheduling_time
+
+    def get_scheduling_scores(self, node_predicted_data, modified_node_data):
+
+        """
+        Get the scoring comparison before/after scheduling
+
+        Args:
+            node_predicted_data: prediction workload for all nodes
+                                 in the cluster (before scheduling)
+            modified_node_data: prediction workload for all nodes
+                                 in the cluster (after scheduling)
+
+        Returns:
+            scheduling_scores: a dict specifying the comparison of scores before/after scheduling.
+                               In stable policy, the score = variance of node workload predictions
+                                                             across nodes.
+
+        """
+
+        score_before = self._compute_score(node_predicted_data)
+        score_after = self._compute_score(modified_node_data)
+
+        scheduling_scores = {'score_before': score_before,
+                             'score_after': score_after,
+                             'time': self.scheduling_time}
+
+        return scheduling_scores
+
+    def node_workload_formatter(self, modified_node_data):
+
+        """
+        Format the scheduled node workload into suitable format for returning to operators.
+
+        Args:
+            modified_node_data: prediction workload for all nodes in the cluster (after scheduling)
+
+        Returns:
+            format_node_workload: Formatted form of modified_node_data
+
+        """
+
+        # get available node list in the cluster
+        node_list = [i['name'] for i in self.processor.get_node_list()]
+
+        node_val = []
+
+        for node_name in node_list:
+
+            node_info = {}
+
+            node_workload_data = modified_node_data[node_name]
+
+            # update key "name":
+            node_info.update({'name': node_name})
+
+            # update key "predicted_raw_data":
+            raw_data_val = []
+
+            for metric_name, values in node_workload_data.items():
+
+                workload = {}
+                workload.update({'metric_type': metric_name})
+
+                # modify workload values:
+                time_val = []
+
+                for time, val in values.items():
+                    timestamp = self.processor.convert_time(time *
+                                                            self.config['data_granularity_sec'])
+                    time_val.append({'time': timestamp,
+                                     'num_value': str(val)})
+
+                workload.update({'data': time_val})
+
+                raw_data_val.append(workload)
+
+            node_info.update({'predicted_raw_data': raw_data_val})
+
+            # update key "is_scheduled":
+            node_info.update({'is_scheduled': True})
+
+            node_val.append(node_info)
+
+        format_node_workload = {'node_predictions': node_val}
+
+        return format_node_workload
