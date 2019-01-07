@@ -3,7 +3,7 @@
 import os
 import re
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 import yaml
 from framework.log.logger import Logger
 from framework.datastore.metric_dao import MockDAO
@@ -214,9 +214,13 @@ class DataProcessor:
                 "node_name": [node["name"] for node in node_list],
                 "time_range": time_range}
 
+            data = []
             queried_data = self.dao.get_data("node_observed", args)
-            data = self._format_nodes_workload_data(data_type,
-                                                    queried_data)
+            for node_metrics in queried_data[self.workload_map[
+                    data_type]["node"]]:
+                if node_metrics["name"] in args["node_name"]:
+                    data.append(node_metrics)
+            data = self._format_nodes_workload_data(data_type, data)
             return data
 
         except Exception:
@@ -236,7 +240,12 @@ class DataProcessor:
                 "node_name": [node["name"] for node in node_list],
                 "time_range": time_range}
 
+            data = []
             queried_data = self.dao.get_data("node_predicted", args)
+            for node_metrics in queried_data[self.workload_map[
+                    data_type]["node"]]:
+                if node_metrics["name"] in args["node_name"]:
+                    data.append(node_metrics)
             data = self._format_nodes_workload_data(data_type,
                                                     queried_data)
             return data
@@ -275,7 +284,7 @@ class DataProcessor:
         """
 
         formatted_data = dict()
-        for node_metrics in data[self.workload_map[data_type]["node"]]:
+        for node_metrics in data:
             node_name = node_metrics["name"]
             formatted_data[node_name] = dict()
             for metrics_data in node_metrics[self.workload_map[
@@ -351,6 +360,66 @@ class DataProcessor:
                           for k in set(points_sum) | set(points)}
 
         return points_sum
+
+    def _format_datahub_predicted_data(self, data):
+        """Format workload predicted data into datahub data structure."""
+
+        time_scaling_sec = self.config["data_granularity_sec"]
+        units_data = []
+        for name, metrics_data in data.items():
+            formatted_metrics_data = []
+            for metric_type, metric_data in metrics_data.items():
+                data_pair = []
+                for time in sorted(metric_data):
+                    time_str = self.convert_time(int(time * time_scaling_sec))
+                    data_pair.append({
+                        "time": time_str,
+                        "num_value": str(metric_data[time])
+                    })
+
+                formatted_metric_data = {
+                    "metric_type": metric_type,
+                    "data": data_pair
+                }
+                formatted_metrics_data.append(formatted_metric_data)
+
+            unit_data = {
+                "name": name,
+                self.workload_map[self.PREDICTED]["metric"]:
+                    formatted_metrics_data
+            }
+            units_data.append(unit_data)
+
+        return units_data
+
+    def write_containers_predicted_data(self, pod_info, data):
+        """Write containers predicted data to operator."""
+        try:
+            containers_data = self._format_datahub_predicted_data(data)
+            pod_data = {
+                "namespaced_name": pod_info["namespaced_name"],
+                self.workload_map[self.PREDICTED]["container"]: containers_data
+            }
+            out_data = {self.workload_map[self.PREDICTED]["pod"]: [pod_data]}
+
+            self.logger.info("Write containers predicted data: %s", out_data)
+            self.dao.write_data("container_prediction", args=out_data)
+        except Exception:
+            self.logger.error(traceback.format_exc())
+
+    def write_nodes_predicted_data(self, data, is_scheduled=False):
+        """Write nodes predicted data to operator."""
+        try:
+            nodes_data = self._format_datahub_predicted_data(data)
+            for idx, _ in enumerate(nodes_data):
+                nodes_data[idx]["is_scheduled"] = is_scheduled
+
+            out_data = {self.workload_map[self.PREDICTED]["node"]: nodes_data}
+
+            self.logger.info("Write nodes predicted data: %s", out_data)
+            self.dao.write_data("node_prediction", args=out_data)
+        except Exception:
+            self.logger.error(traceback.format_exc())
 
     def get_containers_init_resource(self, pod_info, time_range=None):
         """Get container init_resource"""

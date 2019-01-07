@@ -23,7 +23,7 @@ class PredictionThread(threading.Thread):
     """ Thread for prediction """
     def __init__(self, target_fun, log, predictor, observed_data,
                  file_name, output_file_folder,
-                 config, time_scaling_ns, filename_tags_map):
+                 config, filename_tags_map):
         threading.Thread.__init__(self)
         self.log = log
         self.target_fun = target_fun
@@ -32,7 +32,6 @@ class PredictionThread(threading.Thread):
         self.file_name = file_name
         self.output_file_folder = output_file_folder
         self.config = config
-        self.time_scaling_ns = time_scaling_ns
         self.filename_tags_map = filename_tags_map
 
     def run(self):
@@ -40,27 +39,22 @@ class PredictionThread(threading.Thread):
                         self.file_name, self.output_file_folder, self.config)
 
 
-def predict_by_series(log, measurement_conf, granularity_conf, input_file_list,
-                      filename_tags_map, file_folder_name, time_scaling_ns):
+def predict_by_series(log, granularity_conf, input_file_list,
+                      filename_tags_map, file_folder_name):
     """Predict by identical device"""
 
     thread_pool = []
-    filename_tags_map_o = filename_tags_map.copy()
+    config = granularity_conf.copy()
     file_folder_name = file_folder_name.copy()
-    for file_path in input_file_list:
+    for file_name in input_file_list:
         ignored = False
 
-        file_name = file_path.replace(file_folder_name['input'], '')
-        metric_name, file_name = os.path.split(file_name)
-        config = measurement_conf[metric_name].copy()
-        config.update(granularity_conf)
-
         file_folder_name['model'] = \
-            'models/online/workload_prediction/{}/{}/{}'.format(
-                config['mid'], config['name'], file_name)
+            'models/online/workload_prediction/{}/{}'.format(
+                config['mid'], file_name)
         log.info("Prediction: %s", file_folder_name['model'])
 
-        observed_data = get_csv_data(file_path)
+        observed_data = get_csv_data(file_folder_name['input'] + file_name)
         # pylint: disable=W0612
         config['sample_size'], _ = observed_data.shape
         # pylint: enable=W0612
@@ -81,7 +75,7 @@ def predict_by_series(log, measurement_conf, granularity_conf, input_file_list,
                 if config['sample_size'] < \
                         config['minimal_sample_size'] - 1:
                     filename_tags_map[file_name] = '{}_ini'.format(
-                        filename_tags_map_o[file_name])
+                        filename_tags_map[file_name])
 
                     log.warning(
                         'number of data sample of %s is %d and less than '
@@ -92,15 +86,14 @@ def predict_by_series(log, measurement_conf, granularity_conf, input_file_list,
         else:
             raise ValueError(
                 'minimal_sample_size not defined in {}\n'.format(
-                    config['name']))
+                    config['data_granularity']))
 
         if not ignored:
             predictor = SARIMAXPredictor(log=log)
 
             prediction_thread = PredictionThread(
                 _predict_write_file, log, predictor, observed_data, file_name,
-                file_folder_name['output'], config_prdt,
-                time_scaling_ns, filename_tags_map)
+                file_folder_name['output'], config_prdt, filename_tags_map)
             thread_pool.append(prediction_thread)
 
     if thread_pool:
@@ -179,8 +172,8 @@ def _predict_write_file(log, predictor, observed_data,
         prdt_values = np.maximum(prdt_values, 0)
 
     # Write prediction data to file
-    out_prdt_file = '{}{}/{}.prdt'.format(
-        output_file_folder, config['name'], file_name)
+    out_prdt_file = '{}/{}.prdt'.format(
+        output_file_folder, file_name)
     if not os.path.exists(os.path.dirname(out_prdt_file)):
         try:
             os.makedirs(os.path.dirname(out_prdt_file))
@@ -193,10 +186,9 @@ def _predict_write_file(log, predictor, observed_data,
         for index_time, target_time in enumerate(prdt_times):
             predict_point = str(int(target_time))
 
-            for index_field in range(len(config['fields'])):
-                field_value = str(prdt_values[index_time, index_field])
-                predict_point += ',{}'.format(
-                    ('', str(field_value))[not not str(field_value)])
+            field_value = str(prdt_values[index_time, 0])
+            predict_point += ',{}'.format(
+                ('', str(field_value))[not not str(field_value)])
 
             outfile.write(predict_point + '\n')
 
