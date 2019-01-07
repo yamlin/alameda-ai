@@ -31,7 +31,7 @@ class SARIMAXPredictor:
 
         self.MIN_OBSERVATION_NUM = 12
         self.MAX_SEANSONALITY = 32
-        self.MIN_SEANSONALITY = 4
+        self.MIN_SEANSONALITY = 2
 
         # Used to avoid 'maxlag should be < nobs' error that occurs with
         self.OBSERVATION_MULTIPLE = 6
