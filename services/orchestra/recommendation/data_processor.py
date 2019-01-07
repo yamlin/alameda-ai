@@ -246,8 +246,7 @@ class DataProcessor:
                     data_type]["node"]]:
                 if node_metrics["name"] in args["node_name"]:
                     data.append(node_metrics)
-            data = self._format_nodes_workload_data(data_type,
-                                                    queried_data)
+            data = self._format_nodes_workload_data(data_type, data)
             return data
 
         except Exception:
@@ -590,6 +589,13 @@ class DataProcessor:
         except ValueError:
             return False
         return True
+
+    @staticmethod
+    def get_pod_identifier(pod):
+        """Return tuple of namespaced_name as pod identifier."""
+
+        namespaced_name = pod["namespaced_name"]
+        return tuple(namespaced_name[key] for key in sorted(namespaced_name))
 
     def get_pod_recommendation_result(self, pod, init_resource, resources):
         """Write pod recommendation result via gRPC client"""

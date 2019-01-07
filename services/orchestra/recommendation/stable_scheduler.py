@@ -55,7 +55,7 @@ class StableScheduler(object):
         # Initialize scheduling_time to None. Will be concrete when calling "get_scheduling_time"
         self.scheduling_time = None
 
-    def schedule(self):
+    def schedule(self, pod_info):
 
         """
         Main function for StableScheduler.
@@ -68,8 +68,8 @@ class StableScheduler(object):
         """
 
         # query pod/node predicted workload
-        pod_predicted_data, node_predicted_data, pods_current_node, pod_info = \
-            self.query_workload_data()
+        pod_predicted_data, node_predicted_data, pods_current_node = \
+            self.query_workload_data(pod_info)
 
         # extract metric names
         self.metric_names = self.get_metric_names(node_predicted_data)
@@ -112,7 +112,7 @@ class StableScheduler(object):
 
         return metric_names
 
-    def query_workload_data(self):
+    def query_workload_data(self, pod_info):
 
         """
         Query predicted workload data for (a) rescheduled pods (b) cluster nodes.
@@ -124,11 +124,6 @@ class StableScheduler(object):
             pod_info: detailed information about pods that are to be scheduled.
 
         """
-        # query information for pods that are to be scheduled:
-        pod_info = self.processor.get_pod_list()
-
-        # get available node list in the cluster
-        node_list = self.processor.get_node_list()
 
         pod_predicted_data = []
         pods_current_node = []
@@ -139,9 +134,11 @@ class StableScheduler(object):
                 self.processor.query_pod_predicted_data(pod))
             pods_current_node.append(pod['node_name'])
 
+        # get available node list in the cluster
+        node_list = self.processor.get_node_list()
         node_predicted_data = self.processor.query_nodes_predicted_data(node_list)
 
-        return pod_predicted_data, node_predicted_data, pods_current_node, pod_info
+        return pod_predicted_data, node_predicted_data, pods_current_node
 
     @staticmethod
     def all_pod_workload_subtraction(pod_predicted_data,
@@ -192,7 +189,7 @@ class StableScheduler(object):
 
             new_node_name = self.individual_allocation(ind_pod_data, modified_workload)
 
-            key = i
+            key = self.processor.get_pod_identifier(pod_info[i])
             val = {"namespaced_name": pod_info[i]['namespaced_name'],
                    "apply_recommendation_now": True,
                    "assign_pod_policy": {"time": self.scheduling_time,

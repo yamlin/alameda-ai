@@ -10,7 +10,7 @@ def main():
     '''Main entrypoint for demo server.'''
 
     svc_rootpath = '/alameda-ai/services/orchestra'
-    pyscripts = ['grpc_server.py', 'workload_prediction.py']
+    pyscripts = ['grpc_server.py', 'workload_prediction.py', 'recommendation.py']
 
     log = Logger()
     log.info("Start demo server.")
