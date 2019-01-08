@@ -508,7 +508,6 @@ class DataProcessor:
         Format time range with timestamp and duration.
         This method must have at least one time object input,
         [start_time] or [end_time].
-
         :param start_time: (int) start time timestamp in seconds. If None,
             then [start_time] equals to [end_time-duration]
         :param end_time: (int) end time timestamp in seconds. If None,
@@ -595,14 +594,18 @@ class DataProcessor:
         """Write pod recommendation result via gRPC client"""
 
         try:
-            result = {
-                "uid": pod["uid"],
-                "namespace": pod["namespace"],
-                "pod_name": pod["pod_name"],
-                "containers": self._format_container_recommendation_result(
-                    init_resource, resources)
-            }
+
+            result = {}
+
+            result.update({'namespaced_name': pod['namespaced_name']})
+            result.update({'apply_recommendation_now': True})
+
+            result.update({'container_recommendations': self._format_container_recommendation_result(
+                init_resource, resources
+            )})
+
             return result
+
         except Exception as err:
             self.logger.error("Error in 'write_pod_recommendation_result': "
                               "%s %s", type(err), str(err))
@@ -610,27 +613,60 @@ class DataProcessor:
     def _format_container_recommendation_result(self, init_resource, resources):
         """Format the recommendation result to write data by gRPC client."""
 
-        formatted_data = []
-        time_scaling_sec = self.config["data_granularity_sec"]
-        for container_name in resources:
-            container_set = {
-                "container_name": container_name,
-                "recommendations": []
-            }
-            for resource_set in resources[container_name]:
+        container_recommendations = []
 
-                recommendation_set = {
-                    "time": resource_set["time"] * time_scaling_sec,
-                    "resources": {
-                        "requests": resource_set["requests"],
-                        "limits": resource_set["limits"]
-                    }
-                }
-                container_set["recommendations"].append(recommendation_set)
+        for container_name in init_resource.keys():
 
-            if init_resource and init_resource.get(container_name):
-                container_set["init_resource"] = init_resource[container_name]
+            container_dict = {}
 
-            formatted_data.append(container_set)
+            container_dict.update({'name': container_name})
 
-        return formatted_data
+            time = self.convert_time(resources[container_name][0]['time'] *
+                                     self.config['data_granularity_sec'])
+
+            # convert 'limit_recommendations':
+            limit_data = resources[container_name][0]['limits']
+            limit_val = []
+
+            for metric_name, val in limit_data.items():
+                limit_val.append({'metric_type': metric_name,
+                                  'data': [{'time': time,
+                                            'num_value': str(val)}]})
+            container_dict.update({'limit_recommendations': limit_val})
+
+            # convert 'request_recommendations':
+            request_data = resources[container_name][0]['requests']
+            request_val = []
+
+            for metric_name, val in request_data.items():
+                request_val.append({'metric_type': metric_name,
+                                    'data': [{'time': time,
+                                              'num_value': str(val)}]})
+            container_dict.update({'request_recommendations': request_val})
+
+            # convert 'initial_limit_recommendations':
+            init_time = self.convert_time(0 *
+                                          self.config['data_granularity_sec'])
+
+            init_limit_data = init_resource[container_name]['limits']
+            init_limit_val = []
+
+            for metric_name, val in init_limit_data.items():
+                init_limit_val.append({'metric_type': metric_name,
+                                       'data': [{'time': init_time,
+                                                 'num_value': str(val)}]})
+            container_dict.update({'initial_limit_recommendations': init_limit_val})
+
+            # convert 'initial_request_recommendations':
+            init_request_data = init_resource[container_name]['requests']
+            init_request_val = []
+
+            for metric_name, val in init_request_data.items():
+                init_request_val.append({'metric_type': metric_name,
+                                         'data': [{'time': init_time,
+                                                   'num_value': str(val)}]})
+            container_dict.update({'initial_request_recommendations': init_request_val})
+
+            container_recommendations.append(container_dict)
+
+        return container_recommendations
