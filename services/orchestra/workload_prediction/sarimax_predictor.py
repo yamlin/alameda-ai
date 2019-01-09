@@ -164,7 +164,7 @@ class SARIMAXPredictor:
                         AIC.append(results.aic)
                         SARIMAX_model.append([param, param_seasonal])
                     except Exception as err:  # pylint: disable=W0703
-                        self.log.info(err)
+                        self.log.debug(err)
                         continue
 
             mod = sm.tsa.statespace.SARIMAX(
