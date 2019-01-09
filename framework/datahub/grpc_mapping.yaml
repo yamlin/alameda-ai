@@ -1,0 +1,89 @@
+get_methods:
+  container_init:
+    function: 'ListPodMetrics'
+    request: 'ListPodMetricsRequest'
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_observed:
+    function: 'ListPodMetrics'
+    request: 'ListPodMetricsRequest'
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_predicted:
+    function: 'ListPodPredictions'
+    request: 'ListPodPredictionsRequest'
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_observed:
+    function: 'ListNodeMetrics'
+    request: 'ListNodeMetricsRequest'
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_predicted:
+    function: 'ListNodePredictions'
+    request: 'ListNodePredictionsRequest'
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  pod_list:
+    function: 'ListAlamedaPods'
+    request: null
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_list:
+    function: 'ListAlamedaNodes'
+    request: null
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_recommendation:
+    function: 'ListPodRecommendations'
+    request: 'ListPodRecommendationsRequest'
+    method: 'get'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+put_methods:
+  container_prediction:
+    function: 'CreatePodPredictions'
+    request: 'CreatePodPredictionsRequest'
+    method: 'put'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_prediction:
+    function: 'CreateNodePredictions'
+    request: 'CreateNodePredictionsRequest'
+    method: 'put'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_recommendation:
+    function: 'CreatePodRecommendations'
+    request: 'CreatePodRecommendationsRequest'
+    method: 'put'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
