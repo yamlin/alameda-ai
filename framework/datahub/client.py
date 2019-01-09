@@ -77,7 +77,7 @@ class DatahubClient(object):
 
         if res["status"]["code"] != 0:
             msg = "Error: data_type {} request is fail: code={}, msg={}".format(
-                data_type, res.status.code, res.status.message
+                data_type, res["status"]["code"], res["status"]["message"]
             )
             self.logger.error(msg)
             raise Exception(msg)
@@ -104,9 +104,9 @@ class DatahubClient(object):
         else:
             raise Exception("Invalid data type")
 
-        if res["status"]["code"] != 0:
+        if res["code"] != 0:
             msg = "Error: data_type {} request is fail: code={}, msg={}".format(
-                data_type, res.status.code, res.status.message
+                data_type, res["code"], res["message"]
             )
             self.logger.error(msg)
             raise Exception(msg)
