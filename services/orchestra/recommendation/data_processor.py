@@ -6,7 +6,7 @@ import traceback
 from datetime import datetime
 import yaml
 from framework.log.logger import Logger
-from framework.datastore.metric_dao import MockDAO
+from framework.datahub.client import DatahubClient
 
 
 class DataProcessor:
@@ -20,7 +20,7 @@ class DataProcessor:
 
     def __init__(self, logger=None, dao=None, config=None):
         self.logger = logger or Logger()
-        self.dao = dao or MockDAO()
+        self.dao = dao or DatahubClient()
 
         self.config = config
         if self.config is None:
