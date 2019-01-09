@@ -531,7 +531,7 @@ class DataProcessor:
         time_range = {
             "start_time": self.convert_time(start_time),
             "end_time": self.convert_time(end_time),
-            "step": self.config.get("data_granularity_sec", 30)
+            "step": "{}s".format(self.config.get("data_granularity_sec", 30))
         }
 
         return time_range
