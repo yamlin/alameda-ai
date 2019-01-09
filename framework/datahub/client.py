@@ -72,9 +72,7 @@ class DatahubClient(object):
             return response
 
         fmt = "Error: data_type {} request is fail: code={}, msg={}"
-        msg = fmt.format(data_type,
-                         response['status']['code'],
-                         response['status']['message'])
+        msg = fmt.format(data_type, status['code'], status['message'])
         self.logger.error(msg)
         raise Exception(msg)
 
