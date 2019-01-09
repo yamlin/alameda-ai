@@ -89,7 +89,6 @@ class DatahubClient(object):
         function = getattr(client, rules['function'])
         request = getattr(server_pb2, rules['request']) \
             if rules['request'] is not None else empty_pb2.Empty
-        method = rules['method']
         params = rules['parameters'] if 'parameters' in rules else {}
 
         message = ParseDict(args, request())
