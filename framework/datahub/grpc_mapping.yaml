@@ -1,0 +1,92 @@
+get_methods:
+  container_init:
+    function: 'ListPodMetrics'
+    request: 'ListPodMetricsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_observed:
+    function: 'ListPodMetrics'
+    request: 'ListPodMetricsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_predicted:
+    function: 'ListPodPredictions'
+    request: 'ListPodPredictionsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_observed:
+    function: 'ListNodeMetrics'
+    request: 'ListNodeMetricsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_predicted:
+    function: 'ListNodePredictions'
+    request: 'ListNodePredictionsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  pod_list:
+    function: 'ListAlamedaPods'
+    request: null
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_list:
+    function: 'ListAlamedaNodes'
+    request: null
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_recommendation:
+    function: 'ListPodRecommendations'
+    request: 'ListPodRecommendationsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  simulated_scheduling_score:
+    function: 'ListSimulatedSchedulingScores'
+    request: 'ListSimulatedSchedulingScoresRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+put_methods:
+  container_prediction:
+    function: 'CreatePodPredictions'
+    request: 'CreatePodPredictionsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  node_prediction:
+    function: 'CreateNodePredictions'
+    request: 'CreateNodePredictionsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  container_recommendation:
+    function: 'CreatePodRecommendations'
+    request: 'CreatePodRecommendationsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  simulated_scheduling_score:
+    function: 'CreateSimulatedSchedulingScores'
+    request: 'CreateSimulatedSchedulingScoresRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true

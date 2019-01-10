@@ -11,13 +11,26 @@ node('python36') {
       pip install --upgrade setuptools
       pip install -r requirements.txt
       pip install pytest
+      pip install pytest-cov
       pip install filelock
       pip install influxdb
-      export PYTHONPATH=${env.WORKSPACE}
+      export PYTHONPATH=./
       export
-      pytest --junit-xml=test_results.xml tests
-      #python3.6 -B -m unittest discover -v
+      pytest --cov-config=.coveragerc --cov=./
+      curl -s https://codecov.io/bash | bash -s - -t 8de5eed5-52c8-4db8-99cf-04d1fb68f8b3
     """
-    junit keepLongStdio: true, allowEmptyResults: true, testResults: 'test_results.xml'
+  }
+  stage("Lint") {
+    sh """
+      source venv/bin/activate
+      pip install pylint
+      export PYTHONPATH=./
+      cd services
+      pylint ./
+      cd ../framework
+      pylint ./
+      cd ../tests
+      pylint ./
+    """
   }
 }

@@ -16,7 +16,7 @@ Current Algorithm:
             new node should be minimum among all possible choices of node allocation.
 
 """
-
+from random import shuffle
 import operator
 import copy
 import os
@@ -26,6 +26,7 @@ from framework.log.logger import Logger
 from services.orchestra.recommendation.data_processor import DataProcessor
 
 import numpy as np
+
 
 
 class StableScheduler(object):
@@ -60,39 +61,84 @@ class StableScheduler(object):
         """
         Main function for StableScheduler.
 
-        Returns:
-            allocation_result: scheduling results for the pods
-            scheduling_scores: score comparison before/after scheduling
-            scheduled_node_data: node workload prediction after scheduling
-
         """
 
+        allocation_result = None
+        scheduling_scores = None
+        scheduled_node_data = None
+
         # query pod/node predicted workload
-        pod_predicted_data, node_predicted_data, pods_current_node = \
+        success, pod_predicted_data, node_predicted_data, pods_current_node = \
             self.query_workload_data(pod_info)
 
-        # extract metric names
-        self.metric_names = self.get_metric_names(node_predicted_data)
+        # case: any of the necessary data for scheduling is empty.
+        if not success:
+            return success, allocation_result, scheduling_scores, scheduled_node_data
 
-        # get scheduling time
-        self.scheduling_time = self.get_scheduling_time(node_predicted_data)
+        else:
+            # extract metric names
+            self.metric_names = self.get_metric_names(node_predicted_data)
+            # get scheduling time
+            self.scheduling_time = self.get_scheduling_time(node_predicted_data)
 
-        # subtract all the workload of the rescheduled pods from their current node's workload
-        node_workload = self.all_pod_workload_subtraction(pod_predicted_data,
-                                                          node_predicted_data,
-                                                          pods_current_node)
+            # subtract all the workload of the rescheduled pods from their current node's workload
+            node_workload = self.all_pod_workload_subtraction(pod_predicted_data,
+                                                              node_predicted_data,
+                                                              pods_current_node)
 
-        # allocate each pod sequentially to new node.
-        allocation_result, modified_node_data = self.multiple_allocation(pod_predicted_data,
-                                                                         node_workload, pod_info)
+            allocation_result, scheduling_scores, scheduled_node_data = \
+                self.schedule_greedy(pod_predicted_data, node_predicted_data,
+                                     node_workload, pod_info)
 
-        # calculate scheduling scores before/after pod schedulings:
-        scheduling_scores = self.get_scheduling_scores(node_predicted_data, modified_node_data)
+            return success, allocation_result, scheduling_scores, scheduled_node_data
 
-        # convert node workload after scheduling into suitable format
-        scheduled_node_data = self.node_workload_formatter(modified_node_data)
+    def schedule_greedy(self, pod_predicted_data, node_predicted_data, node_workload, pod_info,
+                        shuffle_num=50):
 
-        return allocation_result, scheduling_scores, scheduled_node_data
+        """
+        Greedy search to iterate through all possible scheduling orders of pods
+
+        """
+        all_allocation_result = []
+        all_scheduling_scores = []
+        all_scheduled_node_data = []
+
+        for _ in range(shuffle_num):
+
+            pod_info_copy = copy.deepcopy(pod_info)
+            pod_data_copy = copy.deepcopy(pod_predicted_data)
+
+            temp = list(zip(pod_info_copy, pod_data_copy))
+            shuffle(temp)
+            pod_info_copy, pod_data_copy = zip(*temp)
+
+            allocation_result, modified_node_data = self.multiple_allocation(pod_data_copy,
+                                                                             node_workload,
+                                                                             pod_info_copy)
+
+            # calculate scheduling scores before/after pod schedulings:
+            scheduling_scores = self.get_scheduling_scores(node_predicted_data, modified_node_data)
+
+            all_allocation_result.append(allocation_result)
+            all_scheduling_scores.append(scheduling_scores)
+            all_scheduled_node_data.append(modified_node_data)
+
+        # output the results with minimum score
+        best_allocation_result = all_allocation_result[0]
+        best_scheduling_scores = all_scheduling_scores[0]
+        best_scheduled_node_data = all_scheduled_node_data[0]
+
+        for i in range(shuffle_num):
+            if all_scheduling_scores[i]['score_after'] < \
+                    best_scheduling_scores['score_after']:
+                best_scheduling_scores = all_scheduling_scores[i]
+                best_allocation_result = all_allocation_result[i]
+                best_scheduled_node_data = all_scheduled_node_data[i]
+
+        best_scheduled_node_data = self.node_workload_formatter(best_scheduled_node_data)
+
+        return best_allocation_result, best_scheduling_scores, best_scheduled_node_data
+
 
     @staticmethod
     def get_metric_names(node_predicted_data):
@@ -124,21 +170,35 @@ class StableScheduler(object):
             pod_info: detailed information about pods that are to be scheduled.
 
         """
+        # indicator for whether the querying process is successful
+        success = True
 
         pod_predicted_data = []
         pods_current_node = []
 
         for pod in pod_info:
 
-            pod_predicted_data.append(
-                self.processor.query_pod_predicted_data(pod))
+            data = self.processor.query_pod_predicted_data(pod)
+
+            if not data:
+                self.logger.info('[Scheduler] pod: %s is empty', pod)
+                continue
+
+            pod_predicted_data.append(self.processor.query_pod_predicted_data(pod))
             pods_current_node.append(pod['node_name'])
 
         # get available node list in the cluster
         node_list = self.processor.get_node_list()
         node_predicted_data = self.processor.query_nodes_predicted_data(node_list)
 
-        return pod_predicted_data, node_predicted_data, pods_current_node
+        if not pod_predicted_data:
+            self.logger.info('[Scheduler] pod predicted data is empty, thus not scheduled')
+            success = False
+        if not node_predicted_data:
+            self.logger.info('[Scheduler] node predicted data is empty, thus not scheduled')
+            success = False
+
+        return success, pod_predicted_data, node_predicted_data, pods_current_node
 
     @staticmethod
     def all_pod_workload_subtraction(pod_predicted_data,
@@ -410,7 +470,10 @@ class StableScheduler(object):
                 # modify workload values:
                 time_val = []
 
-                for time, val in values.items():
+                # sort values by key (the order of time):
+                values = sorted(values.items(), key=operator.itemgetter(0))
+
+                for time, val in values:
                     timestamp = self.processor.convert_time(time *
                                                             self.config['data_granularity_sec'])
                     time_val.append({'time': timestamp,

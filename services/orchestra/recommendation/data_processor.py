@@ -211,14 +211,14 @@ class DataProcessor:
                 time_range = self.get_time_range(end_time=time)
 
             args = {
-                "node_name": [node["name"] for node in node_list],
+                "node_names": [node["name"] for node in node_list],
                 "time_range": time_range}
 
             data = []
             queried_data = self.dao.get_data("node_observed", args)
             for node_metrics in queried_data[self.workload_map[
                     data_type]["node"]]:
-                if node_metrics["name"] in args["node_name"]:
+                if node_metrics["name"] in args["node_names"]:
                     data.append(node_metrics)
             data = self._format_nodes_workload_data(data_type, data)
             return data
@@ -237,14 +237,14 @@ class DataProcessor:
                 time_range = self.get_time_range(start_time=time)
 
             args = {
-                "node_name": [node["name"] for node in node_list],
+                "node_names": [node["name"] for node in node_list],
                 "time_range": time_range}
 
             data = []
             queried_data = self.dao.get_data("node_predicted", args)
             for node_metrics in queried_data[self.workload_map[
                     data_type]["node"]]:
-                if node_metrics["name"] in args["node_name"]:
+                if node_metrics["name"] in args["node_names"]:
                     data.append(node_metrics)
             data = self._format_nodes_workload_data(data_type, data)
             return data
@@ -531,7 +531,7 @@ class DataProcessor:
         time_range = {
             "start_time": self.convert_time(start_time),
             "end_time": self.convert_time(end_time),
-            "step": self.config.get("data_granularity_sec", 30)
+            "step": "{}s".format(self.config.get("data_granularity_sec", 30))
         }
 
         return time_range
@@ -596,83 +596,140 @@ class DataProcessor:
         namespaced_name = pod["namespaced_name"]
         return tuple(namespaced_name[key] for key in sorted(namespaced_name))
 
-    def get_pod_recommendation_result(self, pod, init_resource, resources):
-        """Write pod recommendation result via gRPC client"""
+    def get_pod_vpa_recommendation_result(self, pod, init_resource, resources):
+        """
+        Get pod VPA recommendation result
+        :param pod: (dict) the pod info.
+        :param init_resource: (dict) init_stage resource result.
+        :param resources: (dict) recommended resources.
+        :return:
+        """
 
         try:
 
-            result = {}
-
-            result.update({'namespaced_name': pod['namespaced_name']})
-            result.update({'apply_recommendation_now': True})
-
-            result.update({'container_recommendations': self._format_container_recommendation_result(
-                init_resource, resources
-            )})
-
+            result = {
+                "namespaced_name": pod["namespaced_name"],
+                "apply_recommendation_now": True,
+                self.resource_map[self.RECOMMENDATION]["container"]:
+                    self._format_vpa_container_recommendation_result(
+                        init_resource, resources)
+            }
             return result
+        except Exception:
+            self.logger.error(traceback.format_exc())
 
-        except Exception as err:
-            self.logger.error("Error in 'write_pod_recommendation_result': "
-                              "%s %s", type(err), str(err))
+    def _format_vpa_container_recommendation_result(self, init_resource, resources):
+        """Format the VPA recommendation result."""
 
-    def _format_container_recommendation_result(self, init_resource, resources):
-        """Format the recommendation result to write data by gRPC client."""
+        formatted_data = []
+        for container_name in resources:
+            container_set = {"name": container_name}
 
-        container_recommendations = []
+            resource_types = ["requests", "limits"]
+            recommended_set = self._format_recommended_resource(
+                resource_types, resources[container_name])
+            container_set.update(recommended_set)
 
-        for container_name in init_resource.keys():
+            if init_resource and init_resource.get(container_name):
+                recommended_init_set = self._format_recommended_init_resource(
+                    resource_types, init_resource[container_name])
+                container_set.update(recommended_init_set)
 
-            container_dict = {}
+            formatted_data.append(container_set)
 
-            container_dict.update({'name': container_name})
+        return formatted_data
 
-            time = self.convert_time(resources[container_name][0]['time'] *
-                                     self.config['data_granularity_sec'])
+    def _format_recommended_resource(self, resource_types, resources):
+        """Format recommended resource with operator data structure"""
 
-            # convert 'limit_recommendations':
-            limit_data = resources[container_name][0]['limits']
-            limit_val = []
+        data = dict()
+        container_set = dict()
+        time_scaling_sec = self.config["data_granularity_sec"]
+        for resource_set in resources:
+            for resource_type in resource_types:
+                if resource_type not in data:
+                    data[resource_type] = dict()
+                for metric_type, val in resource_set[resource_type].items():
 
-            for metric_name, val in limit_data.items():
-                limit_val.append({'metric_type': metric_name,
-                                  'data': [{'time': time,
-                                            'num_value': str(val)}]})
-            container_dict.update({'limit_recommendations': limit_val})
+                    if metric_type not in data[resource_type]:
+                        data[resource_type][metric_type] = []
 
-            # convert 'request_recommendations':
-            request_data = resources[container_name][0]['requests']
-            request_val = []
+                    data[resource_type][metric_type].append({
+                        "time": self.convert_time(int(
+                            resource_set["time"] * time_scaling_sec)),
+                        "num_value": str(val)
+                    })
 
-            for metric_name, val in request_data.items():
-                request_val.append({'metric_type': metric_name,
-                                    'data': [{'time': time,
-                                              'num_value': str(val)}]})
-            container_dict.update({'request_recommendations': request_val})
+        for resource_type in resource_types:
+            for metric_type, metric_data in data[resource_type].items():
+                recommendation_set = {
+                    "metric_type": metric_type,
+                    "data": metric_data
+                }
 
-            # convert 'initial_limit_recommendations':
-            init_time = self.convert_time(0 *
-                                          self.config['data_granularity_sec'])
+                if self.resource_map[self.RECOMMENDATION][
+                        resource_type] not in container_set:
+                    container_set[self.resource_map[self.RECOMMENDATION][
+                        resource_type]] = []
+                container_set[self.resource_map[self.RECOMMENDATION][
+                    resource_type]].append(recommendation_set)
 
-            init_limit_data = init_resource[container_name]['limits']
-            init_limit_val = []
+        return container_set
 
-            for metric_name, val in init_limit_data.items():
-                init_limit_val.append({'metric_type': metric_name,
-                                       'data': [{'time': init_time,
-                                                 'num_value': str(val)}]})
-            container_dict.update({'initial_limit_recommendations': init_limit_val})
+    def _format_recommended_init_resource(self, resource_types, init_resource):
+        """Format init_stage resource with operator data structure"""
 
-            # convert 'initial_request_recommendations':
-            init_request_data = init_resource[container_name]['requests']
-            init_request_val = []
+        container_set = dict()
+        for resource_type in resource_types:
+            for metric_type, val in init_resource[resource_type].items():
 
-            for metric_name, val in init_request_data.items():
-                init_request_val.append({'metric_type': metric_name,
-                                         'data': [{'time': init_time,
-                                                   'num_value': str(val)}]})
-            container_dict.update({'initial_request_recommendations': init_request_val})
+                recommendation_set = {
+                    "metric_type": metric_type,
+                    "data": [{
+                        "time": self.convert_time(0),
+                        "num_value": str(val)
+                    }]
+                }
 
-            container_recommendations.append(container_dict)
+                if self.resource_map[self.INIT_RECOMMENDATION][
+                        resource_type] not in container_set:
+                    container_set[self.resource_map[
+                        self.INIT_RECOMMENDATION][resource_type]] = []
+                container_set[self.resource_map[
+                    self.INIT_RECOMMENDATION][resource_type]].append(
+                        recommendation_set)
 
-        return container_recommendations
+        return container_set
+
+    def write_pod_recommendation_result(self, vpa_result=None, scheduler_result=None):
+        """
+        Write pod recommendation result to operator.
+        :param vpa_result: (dict) pod recommendation result from recommender(vpa)
+        :param scheduler_result: (dict) pod recommedation result from scheduler
+        :return:
+        """
+
+        results = dict()
+        try:
+            if vpa_result:
+                if not results:
+                    results = vpa_result
+            if scheduler_result:
+                if not results:
+                    results = scheduler_result
+                else:
+                    for pod in scheduler_result:
+                        if pod not in results:
+                            results[pod] = dict()
+                        results[pod].update(scheduler_result[pod])
+
+            if results:
+                overall_results = {
+                    "pod_recommendations": list(results.values())
+                }
+
+                self.logger.info("Write recommendation result: %s",
+                                 overall_results)
+                self.dao.write_data("container_recommendation", overall_results)
+        except Exception:
+            self.logger.error(traceback.format_exc())
