@@ -29,6 +29,8 @@ node('python36') {
       pylint ./
       cd ../framework
       pylint ./
+      cd ../tests
+      pylint ./
     """
   }
 }
