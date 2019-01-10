@@ -211,14 +211,14 @@ class DataProcessor:
                 time_range = self.get_time_range(end_time=time)
 
             args = {
-                "node_name": [node["name"] for node in node_list],
+                "node_names": [node["name"] for node in node_list],
                 "time_range": time_range}
 
             data = []
             queried_data = self.dao.get_data("node_observed", args)
             for node_metrics in queried_data[self.workload_map[
                     data_type]["node"]]:
-                if node_metrics["name"] in args["node_name"]:
+                if node_metrics["name"] in args["node_names"]:
                     data.append(node_metrics)
             data = self._format_nodes_workload_data(data_type, data)
             return data
@@ -237,14 +237,14 @@ class DataProcessor:
                 time_range = self.get_time_range(start_time=time)
 
             args = {
-                "node_name": [node["name"] for node in node_list],
+                "node_names": [node["name"] for node in node_list],
                 "time_range": time_range}
 
             data = []
             queried_data = self.dao.get_data("node_predicted", args)
             for node_metrics in queried_data[self.workload_map[
                     data_type]["node"]]:
-                if node_metrics["name"] in args["node_name"]:
+                if node_metrics["name"] in args["node_names"]:
                     data.append(node_metrics)
             data = self._format_nodes_workload_data(data_type, data)
             return data
