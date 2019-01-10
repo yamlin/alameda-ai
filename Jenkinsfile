@@ -20,4 +20,15 @@ node('python36') {
       curl -s https://codecov.io/bash | bash -s - -t 8de5eed5-52c8-4db8-99cf-04d1fb68f8b3
     """
   }
+  stage("Lint") {
+    sh """
+      source venv/bin/activate
+      pip install pylint
+      export PYTHONPATH=./
+      cd services
+      pylint ./
+      cd ../framework
+      pylint ./
+    """
+  }
 }
