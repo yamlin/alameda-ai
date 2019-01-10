@@ -38,29 +38,31 @@ def main():
             except Exception:
                 recommender_log.error(traceback.format_exc())
 
-        try:
-            allocation_result, scheduling_scores, scheduled_node_data = \
-                scheduler.schedule(recommended_pod_list)
+        if recommended_pod_list:
+            try:
+                success, allocation_result, scores, scheduled_node_data = \
+                    scheduler.schedule(recommended_pod_list)
 
-            for pod in recommended_results:
-                recommended_results[pod].update(allocation_result[pod])
-            overall_results = {
-                "pod_recommendations": list(recommended_results.values())
-            }
+                if success:
+                    processor.write_pod_recommendation_result(
+                        vpa_result=recommended_results,
+                        scheduler_result=allocation_result)
 
-            recommender_log.info("Recommendation result")
-            recommender_log.info(overall_results)
+                    recommender_log.info("Scheduled node workload: %s",
+                                         scheduled_node_data)
+                    processor.dao.write_data("node_prediction",
+                                             scheduled_node_data)
 
-            recommender_log.info("Scheduled node workload")
-            recommender_log.info(scheduled_node_data)
+                    recommender_log.info("Scheduled score: %s", scores)
+                    processor.dao.write_data("simulated_scheduling_score",
+                                             scores)
+                else:
+                    processor.write_pod_recommendation_result(
+                        vpa_result=recommended_results)
+            except Exception:
+                recommender_log.error(traceback.format_exc())
 
-            processor.dao.write_data("container_recommendation", recommended_results)
-            processor.dao.write_data("node_prediction", scheduled_node_data)
-        except Exception as err:
-            recommender_log.error("Error in writing recommendation result via "
-                                  "gRPC client: %s %s", type(err), str(err))
-
-        time.sleep(60)
+        time.sleep(300)
 
     log.info("Recommendation is completed.")
 
