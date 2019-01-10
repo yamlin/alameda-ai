@@ -55,6 +55,13 @@ get_methods:
       preserving_proto_field_name: true
       including_default_value_fields: true
 
+  simulated_scheduling_score:
+    function: 'ListSimulatedSchedulingScores'
+    request: 'ListSimulatedSchedulingScoresRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
 put_methods:
   container_prediction:
     function: 'CreatePodPredictions'
@@ -73,6 +80,13 @@ put_methods:
   container_recommendation:
     function: 'CreatePodRecommendations'
     request: 'CreatePodRecommendationsRequest'
+    parameters:
+      preserving_proto_field_name: true
+      including_default_value_fields: true
+
+  simulated_scheduling_score:
+    function: 'CreateSimulatedSchedulingScores'
+    request: 'CreateSimulatedSchedulingScoresRequest'
     parameters:
       preserving_proto_field_name: true
       including_default_value_fields: true
