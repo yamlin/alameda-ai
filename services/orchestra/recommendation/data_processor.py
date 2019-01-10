@@ -676,3 +676,36 @@ class DataProcessor:
             container_recommendations.append(container_dict)
 
         return container_recommendations
+
+    def write_pod_recommendation_result(self, vpa_result=None, scheduler_result=None):
+        """
+        Write pod recommendation result to operator.
+        :param vpa_result: (dict) pod recommendation result from recommender(vpa)
+        :param scheduler_result: (dict) pod recommedation result from scheduler
+        :return:
+        """
+
+        results = dict()
+        try:
+            if vpa_result:
+                if not results:
+                    results = vpa_result
+            if scheduler_result:
+                if not results:
+                    results = scheduler_result
+                else:
+                    for pod in scheduler_result:
+                        if pod not in results:
+                            results[pod] = dict()
+                        results[pod].update(scheduler_result[pod])
+
+            if results:
+                overall_results = {
+                    "pod_recommendations": list(results.values())
+                }
+
+                self.logger.info("Write recommendation result: %s",
+                                 overall_results)
+                self.dao.write_data("container_recommendation", overall_results)
+        except Exception:
+            self.logger.error(traceback.format_exc())
