@@ -318,7 +318,7 @@ class DataProcessor:
 
         formatted_data = dict()
         for name, sub_data in data.items():
-            aligned_data = self._align_list_points(sub_data)
+            aligned_data = self.align_list_points(sub_data)
             if not aligned_data:
                 return None
 
@@ -327,7 +327,7 @@ class DataProcessor:
         return formatted_data
 
     @staticmethod
-    def _align_list_points(points_map):
+    def align_list_points(points_map):
         """
         Align a list of workload points by time.
         :param points_map: (dict) list of points with corresponding key name
@@ -464,6 +464,8 @@ class DataProcessor:
                 container_data[self.resource_map[data_type]["requests"]]
             for metric_data in requests_data:
                 metric_type = metric_data["metric_type"]
+                if not metric_data["data"]:
+                    continue
                 val = float(metric_data["data"][-1]["num_value"])
                 requests[metric_type] = val
 
@@ -472,11 +474,14 @@ class DataProcessor:
             limits_data = container_data[self.resource_map[data_type]["limits"]]
             for metric_data in limits_data:
                 metric_type = metric_data["metric_type"]
+                if not metric_data["data"]:
+                    continue
                 val = float(metric_data["data"][-1]["num_value"])
                 limits[metric_type] = val
 
-            formatted_data[container_name] = {
-                "limits": limits, "requests": requests}
+            if requests and limits:
+                formatted_data[container_name] = {
+                    "limits": limits, "requests": requests}
 
         return formatted_data
 
