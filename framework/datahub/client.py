@@ -17,10 +17,25 @@ class DatahubClient(object):
     METHOD_PUT = 'put_methods'
 
     def __init__(self, client=None, config=None):
+        '''Construct DatahubClient.'''
+
         self.client = client
         self.config = config
         self.logger = Logger()
         self.grpc_mapping = None
+        self.grpc_mapfile = None
+
+        self.__channel = None
+
+    def __del__(self):
+        '''Destruct DatahubClient.'''
+
+        if self.client:
+            self.client = None
+            self.__channel.close()
+
+        if self.grpc_mapping:
+            self.grpc_mapfile.close()
 
     def __get_client(self):
         '''Get the gRPC client.
@@ -33,16 +48,15 @@ class DatahubClient(object):
         if self.client:
             return self.client
 
-        if not self.config:
+        if not self.config or "server" not in self.config:
             self.config = {
                 "server": get_datahub_server()
             }
 
-        self.logger.info("DAO config: %s", str(self.config))
+        self.logger.info("DatahubClient: %s", str(self.config))
 
-        conn_str = self.config["server"]
-        channel = grpc.insecure_channel(conn_str)
-        self.client = server_pb2_grpc.DatahubServiceStub(channel)
+        self.__channel = grpc.insecure_channel(self.config["server"])
+        self.client = server_pb2_grpc.DatahubServiceStub(self.__channel)
 
         return self.client
 
@@ -53,8 +67,8 @@ class DatahubClient(object):
             return self.grpc_mapping
 
         curdir = os.path.dirname(os.path.realpath(__file__))
-        config = open(os.path.join(curdir, "grpc_mapping.yaml"), "r")
-        self.grpc_mapping = yaml.load(config)
+        self.grpc_mapfile = open(os.path.join(curdir, "grpc_mapping.yaml"), "r")
+        self.grpc_mapping = yaml.load(self.grpc_mapfile)
 
         return self.grpc_mapping
 

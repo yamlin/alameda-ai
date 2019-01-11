@@ -18,8 +18,9 @@ class LogFileHandler(logging.FileHandler):
     def __del__(self):
 
         if self.filelock is not None:
-            self.filelock.release(force=True)
             lockpath = self.filelock.lock_file
+            self.filelock.release(force=True)
+            self.filelock = None
             os.remove(lockpath)
 
     def setup(self):

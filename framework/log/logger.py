@@ -1,5 +1,6 @@
 '''Log wrapper for all services.'''
 
+import os
 import logging
 from framework.log.logfile_handler import LogFileHandler
 
@@ -26,11 +27,21 @@ class Logger:
         self.logger.propagate = False
         self.logger.setLevel(Logger.__get_logging_level(level))
 
-        # Set only one handler
+        # Check permission of the given logfile:
+        try:
+            open(logfile, 'a').close()
+        except OSError:
+            logfile = os.path.join(os.environ['PYTHONPATH'],
+                                   os.path.basename(logfile))
+
+        # Set file and stream handlers
         self.logger.handlers = []
         self.file_handler = LogFileHandler(name, logfile)
         self.file_handler.setup()
         self.logger.addHandler(self.file_handler)
+
+        stream_handler = logging.StreamHandler()
+        self.logger.addHandler(stream_handler)
 
         self.file_handler.flush()
 
