@@ -19,34 +19,33 @@ class Recommender:
     def recommend(self, pod):
         """Main function to give recommendation result"""
 
-        namespace = pod["namespace"]
-        pod_name = pod["pod_name"]
         self.logger.info("[Recommender] Resource recommendation for pod "
                          "\"%s\"\n", pod)
 
         # [1] Retrieve prediction data
-        predicted_data = self.processor.query_containers_predicted_data(
-            namespace, pod_name)
+        predicted_data = self.processor.query_containers_predicted_data(pod)
         if not predicted_data:
             self.logger.info("[Recommender] Pod \"%s\" query results is empty; "
                              "thus not recommended\n", pod)
             return False, None
 
         # [2] Recommendation
-        init_resource = self.init_stage(namespace, pod_name)
+        init_resource = self.init_stage(pod)
         resource = self.predict_stage(predicted_data, init_resource)
-        resource_spec = self.processor.get_containers_resources(
-            namespace, pod_name)
+        resource_spec = self.processor.get_containers_resources(pod)
 
         # [3] Scheduler and write results
         keep = self._keep_recommendation(resource, resource_spec)
         recommend_results = dict()
         if keep:
-            recommend_results = self.processor.get_pod_recommendation_result(
+            recommend_results = self.processor.get_pod_vpa_recommendation_result(
                 pod, init_resource, resource)
+            if not recommend_results:
+                keep = False
+
         return keep, recommend_results
 
-    def init_stage(self, namespace, pod_name):
+    def init_stage(self, pod):
         """
         Find out init stage and compute init stage resources.
         Init stage is a short period after a pod is created that might have
@@ -56,8 +55,7 @@ class Recommender:
         init_resource = dict()
 
         # Get init stage resource based on init stage observed workload.
-        init_data = self.processor.query_containers_init_observed_data(
-            namespace, pod_name)
+        init_data = self.processor.query_containers_init_observed_data(pod)
         if isinstance(init_data, dict):
             for container_name, container_data in init_data.items():
                 resource_set = {"requests": dict(), "limits": dict()}
@@ -78,8 +76,7 @@ class Recommender:
                 init_resource[container_name] = resource_set
 
         # Get init stage resource from previous recommendation result.
-        init_resource_pr = self.processor.get_containers_init_resource(
-            namespace, pod_name)
+        init_resource_pr = self.processor.get_containers_init_resource(pod)
         if isinstance(init_resource_pr, dict):
             for container_name, container_data in init_resource_pr.items():
                 if container_name not in init_resource:
@@ -171,10 +168,11 @@ class Recommender:
     @staticmethod
     def _requests_limits_rule(metric_type, data_mean, data_max):
 
-        if metric_type == 'cpu':
+        metric_type = metric_type.lower()
+        if 'cpu' in metric_type:
             requests = data_mean
             limits = data_max
-        elif metric_type == 'memory':
+        elif 'memory' in metric_type:
             requests = data_max
             limits = data_max
         else:

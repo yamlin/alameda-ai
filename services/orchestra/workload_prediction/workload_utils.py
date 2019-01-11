@@ -26,17 +26,18 @@ def get_csv_data(csv_file):
     return np.array(data)
 
 
-def get_container_name(file_path, filename_tags_map):
-    """Get container name from tags."""
+def get_unit_name_type(file_path, filename_tags_map):
+    """Get predicted unit's name and metric type from tags."""
     file_name = os.path.basename(file_path)
     if ".prdt" in file_name:
         file_name = file_name.replace(".prdt", "")
 
     tags = filename_tags_map[file_name]
     tags = dict(t.split('=') for t in tags.split(',') if '=' in t)
-    container_name = tags.get("container_name")
+    name = tags.get("name")
+    metric_type = tags.get("type")
 
-    return container_name
+    return name, metric_type
 
 
 def get_metric_name_and_conf(file_path, measurement_conf):

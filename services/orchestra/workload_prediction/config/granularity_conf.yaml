@@ -31,8 +31,8 @@
 30s:
   data_granularity: 30s
   mid: 30s
-  data_amount: 2h
-  data_amount_sec: 7200
-  minimal_sample_size: 230
+  data_amount: 1h
+  data_amount_sec: 3600
+  minimal_sample_size: 100
   training_steps: 600
-  prediction_steps: 60
+  prediction_steps: 30
