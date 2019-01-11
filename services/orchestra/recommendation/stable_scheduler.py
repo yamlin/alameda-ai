@@ -199,6 +199,29 @@ class StableScheduler(object):
             self.logger.info('[Scheduler] node predicted data is empty, thus not scheduled')
             success = False
 
+        mapped_data = dict()
+
+        for i, pod_data in enumerate(pod_predicted_data):
+            for metric_type, val in pod_data.items():
+                mapped_data[('POD', i, metric_type)] = val
+
+        for node_name, node_data in node_predicted_data.items():
+            for metric_type, val in node_data.items():
+                mapped_data[('NODE', node_name, metric_type)] = val
+
+        mapped_data = self.processor.align_list_points(mapped_data)
+
+        for i, pod_data in enumerate(pod_predicted_data):
+
+            for metric_type in pod_data:
+                pod_predicted_data[i][metric_type] = \
+                    mapped_data[('POD', i, metric_type)]
+
+        for node_name, node_data in node_predicted_data.items():
+            for metric_type in node_data:
+                node_predicted_data[node_name][metric_type] = \
+                    mapped_data[('NODE', node_name, metric_type)]
+
         return success, pod_predicted_data, node_predicted_data, pods_current_node
 
     def all_pod_workload_subtraction(self, pod_predicted_data,

@@ -20,7 +20,7 @@ class DataProcessor:
 
     def __init__(self, logger=None, dao=None, config=None):
         self.logger = logger or Logger()
-        self.dao = dao or DatahubClient()
+        self.dao = dao or DatahubClient(config=dao_config)
 
         self.config = config
         if self.config is None:
@@ -318,7 +318,7 @@ class DataProcessor:
 
         formatted_data = dict()
         for name, sub_data in data.items():
-            aligned_data = self._align_list_points(sub_data)
+            aligned_data = self.align_list_points(sub_data)
             if not aligned_data:
                 return None
 
@@ -327,7 +327,7 @@ class DataProcessor:
         return formatted_data
 
     @staticmethod
-    def _align_list_points(points_map):
+    def align_list_points(points_map):
         """
         Align a list of workload points by time.
         :param points_map: (dict) list of points with corresponding key name
