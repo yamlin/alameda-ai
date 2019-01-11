@@ -20,7 +20,7 @@ class DataProcessor:
 
     def __init__(self, logger=None, dao=None, config=None):
         self.logger = logger or Logger()
-        self.dao = dao or DatahubClient(config=dao_config)
+        self.dao = dao or DatahubClient)
 
         self.config = config
         if self.config is None:
