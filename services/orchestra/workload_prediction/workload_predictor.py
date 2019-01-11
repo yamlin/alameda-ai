@@ -221,7 +221,7 @@ class WorkloadPredictor:
                 filename_tags_map[file_name] = tags
 
                 series_map[file_name] = \
-                    ['%s,%s' % (key, val) for key, val in data.items()]
+                    ['%s,%s' % (key, data[key]) for key in sorted(data)]
 
         return series_map, time_scaling_sec, filename_tags_map
 

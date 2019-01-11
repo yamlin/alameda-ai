@@ -38,7 +38,7 @@ class Recommender:
         keep = self._keep_recommendation(resource, resource_spec)
         recommend_results = dict()
         if keep:
-            recommend_results = self.processor.get_pod_recommendation_result(
+            recommend_results = self.processor.get_pod_vpa_recommendation_result(
                 pod, init_resource, resource)
             if not recommend_results:
                 keep = False
