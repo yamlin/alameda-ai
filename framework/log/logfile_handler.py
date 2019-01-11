@@ -21,7 +21,7 @@ class LogFileHandler(logging.FileHandler):
             lockpath = self.filelock.lock_file
             self.filelock.release(force=True)
             self.filelock = None
-            # os.remove(lockpath)
+            os.remove(lockpath)
 
     def setup(self):
         '''Setup for custom log module.

@@ -8,6 +8,7 @@ from alameda_api.v1alpha1.datahub import server_pb2, server_pb2_grpc
 from framework.datahub.client import DatahubClient
 
 
+@unittest.skip
 class DatahubClientTestCase(unittest.TestCase):
     '''Unit test for datahub client.'''
 
