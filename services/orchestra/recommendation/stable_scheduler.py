@@ -28,7 +28,6 @@ from services.orchestra.recommendation.data_processor import DataProcessor
 import numpy as np
 
 
-
 class StableScheduler(object):
 
     """
@@ -89,6 +88,8 @@ class StableScheduler(object):
             allocation_result, scheduling_scores, scheduled_node_data = \
                 self.schedule_greedy(pod_predicted_data, node_predicted_data,
                                      node_workload, pod_info)
+
+            scheduling_scores = {'scores': [scheduling_scores]}
 
             return success, allocation_result, scheduling_scores, scheduled_node_data
 
@@ -200,8 +201,7 @@ class StableScheduler(object):
 
         return success, pod_predicted_data, node_predicted_data, pods_current_node
 
-    @staticmethod
-    def all_pod_workload_subtraction(pod_predicted_data,
+    def all_pod_workload_subtraction(self, pod_predicted_data,
                                      node_predicted_data, pods_current_node):
 
         """
@@ -219,6 +219,11 @@ class StableScheduler(object):
         node_workload = copy.deepcopy(node_predicted_data)
 
         for i, node_name in enumerate(pods_current_node):
+
+            if node_name not in node_workload:
+                self.logger.info('[Scheduler] Node name %s not in node list', node_name)
+                continue
+
             for metric_name in node_workload[node_name].keys():
                 for timestamp in node_workload[node_name][metric_name].keys():
                     node_workload[node_name][metric_name][timestamp] -= \
